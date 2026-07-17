@@ -1,0 +1,121 @@
+[
+  {
+    "dato": "2026-07-14",
+    "side": "/selge/sjekk-din-boligverdi",
+    "tiltak": "Ny ingress (svar-først) + FAQ med schema",
+    "malord": [
+      "boligverdi",
+      "hva er boligen verdt",
+      "boligverdi estimat"
+    ],
+    "status": "aktiv"
+  },
+  {
+    "dato": "2026-07-15",
+    "side": "/selge/boligselgerforsikring",
+    "tiltak": "Ny tittel (pris-vinkel), eierskifteforsikring i ingress+FAQ, pristabell, interne lenker",
+    "malord": [
+      "boligselgerforsikring",
+      "eierskifteforsikring",
+      "boligselgerforsikring pris"
+    ],
+    "status": "aktiv"
+  },
+  {
+    "dato": "2026-07-15",
+    "side": "/kjope/boligkjoperforsikring",
+    "tiltak": "Pris-H2 med søkeord, FAQ-punkt, interne lenker fra kjøpe-seksjonen",
+    "malord": [
+      "boligkjøperforsikring"
+    ],
+    "status": "aktiv",
+    "notat": "29→15 allerede uke 29"
+  },
+  {
+    "dato": "2026-07-15",
+    "side": "/e-takst",
+    "tiltak": "Ny meta-beskrivelse (pris+leveringstid), Product-markup-test",
+    "malord": [
+      "e takst",
+      "etakst",
+      "e-takst"
+    ],
+    "status": "aktiv"
+  },
+  {
+    "dato": "2026-07-15",
+    "side": "/kjope/finansieringsbevis",
+    "tiltak": "Kalkulator-seksjon 'Hvor mye kan du låne?', gratis-setning, brødtekstlenke til kalkulator",
+    "malord": [
+      "finansieringsbevis"
+    ],
+    "status": "aktiv"
+  },
+  {
+    "dato": "2026-07-16",
+    "side": "/eiendomsmegler",
+    "tiltak": "Ny tittel uten pipe-liste",
+    "malord": [
+      "eiendomsmegler",
+      "megler"
+    ],
+    "status": "aktiv"
+  },
+  {
+    "dato": "2026-07-16",
+    "side": "/egenkapital-boliglan",
+    "tiltak": "Ny tittel med krav/unntak-vinkel",
+    "malord": [
+      "egenkapital"
+    ],
+    "status": "aktiv"
+  },
+  {
+    "dato": "2026-07-16",
+    "side": "/magasin/AI-verktoy-boligkjop",
+    "tiltak": "Lenke til ny-boligmatch (primær for 'bolig ai'), nye titler/metaer",
+    "malord": [
+      "bolig ai"
+    ],
+    "status": "aktiv"
+  },
+  {
+    "dato": "2026-07-14",
+    "side": "9+ magasinartikler",
+    "tiltak": "Fikset boligverdi-CTA (pekte til /selge)",
+    "malord": [],
+    "status": "aktiv"
+  },
+  {
+    "dato": "planlagt",
+    "side": "/prisstatistikk + ~60 undersider",
+    "tiltak": "Teknisk: dynamiske titler m/måned, månedstekst, unike metaer, FAQ, zipCode-canonicals",
+    "malord": [
+      "boligpriser",
+      "boligpriser oslo",
+      "kvadratmeterpris oslo"
+    ],
+    "status": "hos teknisk"
+  },
+  {
+    "dato": "planlagt",
+    "side": "56 avdelingssider",
+    "tiltak": "Teknisk: verdivurdering-CTA-blokk i mal",
+    "malord": [
+      "verdivurdering bolig",
+      "gratis verdivurdering"
+    ],
+    "status": "hos teknisk"
+  },
+  {
+    "dato": "planlagt",
+    "side": "/solgte-boliger (ny seksjon)",
+    "tiltak": "Teknisk/produkt: oppslagsside + områdesider",
+    "malord": [
+      "hva ble boligen solgt for",
+      "solgte boliger",
+      "finn solgte boliger"
+    ],
+    "status": "hos teknisk"
+  }
+]

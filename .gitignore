@@ -1,0 +1,19 @@
+.env
+data/*
+*.db
+!data/history.db
+credentials/
+service-account*.json
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.DS_Store
+
+# docs/ er GitHub Pages sin kildemappe (kun index.html-dashboardet hører hjemme der).
+# De opprinnelige Cowork-referansedokumentene (crawl-rapporter, backlogg, briefer) er
+# interne arbeidsdokumenter, ikke kode, og skal ikke havne i et repo hvis docs/-mappe
+# potensielt blir offentlig tilgjengelig via Pages. De ligger fortsatt lokalt.
+docs/*
+!docs/index.html

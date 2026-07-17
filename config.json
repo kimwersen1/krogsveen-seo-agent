@@ -1,0 +1,44 @@
+{
+  "ahrefs": {
+    "project_id": 8825594,
+    "brand_radar_report_id": "019f5beb-5f1a-7d06-ae2d-4458c86782ee",
+    "country": "NO",
+    "plan": "Lite (100000 units/mnd)"
+  },
+  "gsc": {
+    "property": "VERIFISER: sc-domain:krogsveen.no eller https://www.krogsveen.no/",
+    "status": "bygg direkte via service account"
+  },
+  "drive": {
+    "rapport_mappe_id": "1bHjPT1HVyDvL7StnI1DREpIYc96ofzdg",
+    "mappe_navn": "SEO-rapporter Krogsveen"
+  },
+  "konkurrenter": [
+    "hjemla.no",
+    "dnbeiendom.no",
+    "eiendomsmegler1.no",
+    "privatmegleren.no",
+    "nordvikbolig.no",
+    "bolig.ai",
+    "eie.no",
+    "meglersmart.no"
+  ],
+  "geo_prompts": [
+    "hva er boligen min verdt",
+    "hvordan finne ut hva boligen er verdt",
+    "beste eiendomsmegler i Norge",
+    "anbefal eiendomsmegler i Oslo",
+    "hva koster det å selge bolig",
+    "hvordan selge bolig",
+    "hva er boligprisene i Norge nå",
+    "boligprisutvikling Oslo",
+    "hva er e-takst",
+    "trenger jeg boligselgerforsikring",
+    "hvordan få finansieringsbevis",
+    "hva ble naboens bolig solgt for"
+  ],
+  "varsel_terskler": {
+    "posisjon_endring": 3,
+    "klikk_endring_pct": 20
+  }
+}

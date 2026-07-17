@@ -1,0 +1,55 @@
+name: Ukentlig SEO/GEO-rapport
+
+# Aktiveres først når secrets under er lagt inn i repoet (steg 8 i oppsett-guiden).
+# Cron er i UTC: 05:00 UTC = 07:00 Europe/Oslo sommertid (06:00 vintertid).
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write # trengs for å committe docs/index.html tilbake til repoet (GitHub Pages)
+
+jobs:
+  weekly-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Skriv service account-nøkkel til fil
+        run: |
+          mkdir -p credentials
+          echo "$GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT" > credentials/service-account.json
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT }}
+
+      # NB: --gsc-query-export/--gsc-page-export er ikke satt her — CSV-en må eksporteres
+      # manuelt fra GSC UI (se scripts/run_weekly.py), så den automatiske kjøringen får kun
+      # site-wide GSC-tall (via Ahrefs), ikke klikk per søkeord/side.
+      - name: Kjør ukesrapport
+        env:
+          AHREFS_API_KEY: ${{ secrets.AHREFS_API_KEY }}
+          AHREFS_PROJECT_ID: ${{ secrets.AHREFS_PROJECT_ID }}
+          AHREFS_BRAND_RADAR_REPORT_ID: ${{ secrets.AHREFS_BRAND_RADAR_REPORT_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: credentials/service-account.json
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
+        run: python scripts/run_weekly.py
+
+      # data/history.db er unntatt fra .gitignore med vilje — uten dette starter hver
+      # kjøring med tom database (GitHub-runnere er engangsbruk), og trendgrafer/
+      # tiltaks-historikk over flere uker ville aldri bygget seg opp.
+      - name: Publiser dashboard og historikk-database
+        run: |
+          git config user.name "krogsveen-seo-agent"
+          git config user.email "actions@github.com"
+          git add docs/index.html data/history.db
+          git diff --staged --quiet && echo "Ingen endringer å committe" || git commit -m "Oppdater dashboard og historikk — uke $(date +%V)"
+          git push

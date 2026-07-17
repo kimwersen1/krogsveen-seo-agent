@@ -1,0 +1,10 @@
+{
+  "boligverdi": "boligverdi|verdt|verdivurdering|eiendomsverdi|boligkalkulator|e.?takst|takst",
+  "boligpriser": "boligpris|prisstatistikk|kvadratmeterpris|eiendomspris|boligmarked",
+  "finansiering": "finansieringsbevis|boliglån|egenkapital|lånebevis",
+  "forsikring": "forsikring|eierskifte",
+  "solgte_boliger": "solgt|eiendomsoverdragelse",
+  "lokal_megler": "(eiendoms)?megler (i )?(oslo|bergen|trondheim|stavanger|drammen|sandefjord|fredrikstad|tromsø|ålesund|tønsberg|kristiansand|hamar|moss|lillestrøm|asker|bærum)",
+  "merkevare": "krogsveen",
+  "kjop": "til salgs|kjøpe bolig|enebolig|leilighet|rekkehus|gi bud|budrunde|finn bolig"
+}

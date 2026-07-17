@@ -1,0 +1,40 @@
+name: Månedlig søkeordsoppdagelse
+
+# Kun manuell trigger (workflow_dispatch) inntil brukeren har bekreftet cron-tidspunkt
+# og sjekket kostnaden (typisk 3 000-6 000 Ahrefs-enheter per kjøring) er ok på løpende
+# basis. Aktiver cron ved å fjerne kommentaren under når det er avklart — foreslått
+# tidspunkt: kl. 06:00 UTC første dag i hver måned.
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: "0 6 1 * *"
+
+jobs:
+  keyword-discovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Skriv service account-nøkkel til fil
+        run: |
+          mkdir -p credentials
+          echo "$GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT" > credentials/service-account.json
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT }}
+
+      - name: Kjør søkeordsoppdagelse
+        env:
+          AHREFS_API_KEY: ${{ secrets.AHREFS_API_KEY }}
+          AHREFS_PROJECT_ID: ${{ secrets.AHREFS_PROJECT_ID }}
+          AHREFS_BRAND_RADAR_REPORT_ID: ${{ secrets.AHREFS_BRAND_RADAR_REPORT_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: credentials/service-account.json
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
+        run: python scripts/keyword_discovery.py --to-drive
