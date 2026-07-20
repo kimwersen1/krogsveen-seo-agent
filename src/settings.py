@@ -34,6 +34,7 @@ class Settings:
     google_service_account_json: Path
     google_drive_folder_id: str
     google_report_doc_name: str
+    google_dashboard_sheet_name: str
     anthropic_api_key: str
     anthropic_model: str
     clusters: dict = field(default_factory=dict)
@@ -65,6 +66,7 @@ def load_settings() -> Settings:
         google_service_account_json=Path(_require("GOOGLE_SERVICE_ACCOUNT_JSON")),
         google_drive_folder_id=_require("GOOGLE_DRIVE_FOLDER_ID"),
         google_report_doc_name=os.environ.get("GOOGLE_REPORT_DOC_NAME", "SEO-ukentlig rapport Krogsveen"),
+        google_dashboard_sheet_name=os.environ.get("GOOGLE_DASHBOARD_SHEET_NAME", "SEO-dashboard Krogsveen"),
         anthropic_api_key=_require("ANTHROPIC_API_KEY"),
         anthropic_model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
         clusters=_load_json("clusters.json"),

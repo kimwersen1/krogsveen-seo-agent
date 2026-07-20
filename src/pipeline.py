@@ -5,14 +5,17 @@ import logging
 from datetime import date, timedelta
 from pathlib import Path
 
+from googleapiclient.errors import HttpError
+
 from src.analysis import clusters as cluster_analysis
 from src.analysis import diffs as diff_analysis
 from src.analysis import geo as geo_analysis
 from src.analysis import tiltak as tiltak_analysis
 from src.collectors import ahrefs, claude_geo, gsc, storage
-from src.report.dashboard import build_dashboard_payload, render_dashboard
+from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
 from src.report.generate import generate_report
+from src.report.sheets_writer import DashboardSheetNotFound, update_dashboard_sheet
 from src.settings import Settings, load_settings
 
 logger = logging.getLogger(__name__)
@@ -98,12 +101,21 @@ def run_pipeline(
                 }
             )
 
-    gsc_site_history = ahrefs.get_gsc_performance_history(
-        settings, windows["prev_week_start"].isoformat(), windows["week_end"].isoformat()
-    )
-    gsc_site_by_device = ahrefs.get_gsc_performance_by_device(
-        settings, windows["week_start"].isoformat(), windows["week_end"].isoformat()
-    )
+    # GSC-data hos Ahrefs kan ha noen dagers etterslep fra Google — spør om et vindu
+    # som slutter noen dager tilbake i tid i stedet for i går, og degrader til en
+    # notert datamangel (ikke krasj) hvis selv det mangler denne uken.
+    gsc_available_end = min(windows["week_end"], today - timedelta(days=3))
+    try:
+        gsc_site_history = ahrefs.get_gsc_performance_history(
+            settings, windows["prev_week_start"].isoformat(), gsc_available_end.isoformat()
+        )
+        gsc_site_by_device = ahrefs.get_gsc_performance_by_device(
+            settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
+        )
+    except ahrefs.AhrefsError as e:
+        logger.warning("GSC-data (via Ahrefs) ikke tilgjengelig denne uken: %s", e)
+        data_gaps.append("GSC-data (via Ahrefs) var ikke tilgjengelig for perioden denne uken — trolig etterslep hos Google/Ahrefs.")
+        gsc_site_history, gsc_site_by_device = [], []
     gsc_site_rows = list(gsc_site_by_device)
     if gsc_site_history:
         latest = gsc_site_history[-1]
@@ -201,11 +213,21 @@ def run_pipeline(
         "title": title,
         "report_url": None,
         "dashboard_path": str(dashboard_path),
+        "sheet_url": None,
     }
 
     if dry_run:
         logger.info("Dry-run: laster ikke opp til Drive.")
     else:
         result["report_url"] = prepend_report_section(settings, title, report_markdown)
+        try:
+            sheet_payload = build_sheet_payload(dashboard_payload)
+            result["sheet_url"] = update_dashboard_sheet(settings, sheet_payload)
+        except (DashboardSheetNotFound, HttpError) as e:
+            # Rapporten til Drive-dokumentet er allerede lagret på dette tidspunktet —
+            # en feil her (manglende ark, API ikke aktivert, forbigående Google-feil)
+            # skal aldri få hele kjøringen til å se ut som en fiasko i loggen/exit-koden.
+            logger.warning("Dashboard-arket kunne ikke oppdateres denne uken: %s", e)
+            data_gaps.append(f"Dashboard-ark (Google Sheets) ble ikke oppdatert denne uken: {e}")
 
     return result

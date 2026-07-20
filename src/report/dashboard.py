@@ -42,6 +42,35 @@ def build_dashboard_payload(
     }
 
 
+def build_sheet_payload(dashboard_payload: dict) -> dict:
+    """Flat versjon av dashboard-payloaden, tilpasset Google Sheets-skriveren
+    (se src/report/sheets_writer.py) — samme kildedata, enklere struktur."""
+    geo = dashboard_payload.get("geo", {})
+    claude_rows = geo.get("claude_selvsjekk", [])
+    site_metrics = dashboard_payload.get("site_metrics") or {}
+    domain_rating = dashboard_payload.get("domain_rating") or {}
+    all_device = next((r for r in dashboard_payload.get("gsc_site", []) if r.get("device") == "all"), {})
+
+    return {
+        "generated": dashboard_payload["generated"],
+        "uke": dashboard_payload["uke"],
+        "ar": dashboard_payload["ar"],
+        "domain_rating": domain_rating.get("domain_rating"),
+        "org_traffic": site_metrics.get("org_traffic"),
+        "gsc_clicks": all_device.get("clicks"),
+        "ai_overview_count": len(geo.get("ai_overview_sokeord", [])),
+        "claude_mentions": sum(1 for r in claude_rows if r.get("krogsveen_mentioned")),
+        "claude_total": len(claude_rows),
+        "avg_position": (
+            dashboard_payload["position_trend"][-1]["avg_position"] if dashboard_payload.get("position_trend") else None
+        ),
+        "cluster_summaries": dashboard_payload.get("cluster_summaries", []),
+        "claude_selvsjekk": claude_rows,
+        "tiltak": dashboard_payload.get("tiltak", []),
+        "competitor_benchmark": dashboard_payload.get("competitor_benchmark", []),
+    }
+
+
 def render_dashboard(payload: dict, output_path: Path = OUTPUT_PATH) -> Path:
     html = _TEMPLATE.replace("__DASHBOARD_DATA__", json.dumps(payload, ensure_ascii=False))
     output_path.parent.mkdir(parents=True, exist_ok=True)

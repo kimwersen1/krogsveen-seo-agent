@@ -45,6 +45,8 @@ def main() -> None:
         print(f"Dry-run fullført. Rapport skrevet til {out_path}")
     else:
         print(f"Rapport lastet opp: {result['report_url']}")
+        print(f"Dashboard (lokal fil): {result['dashboard_path']}")
+        print(f"Dashboard (Google Sheet): {result['sheet_url'] or 'ikke oppdatert — se logg'}")
 
 
 if __name__ == "__main__":
