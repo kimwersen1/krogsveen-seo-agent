@@ -157,9 +157,10 @@ def update_dashboard_sheet(settings: Settings, payload: dict) -> str:
     for c in payload.get("cluster_summaries", []):
         rows.append([c["name"], c["keyword_count"], round(c["avg_position_delta"], 2)])
 
-    rows += [["", "", ""], ["GEO-prompt (Claude)", "Nevnt?", ""]]
+    rows += [["", "", ""], ["GEO-prompt (Claude)", "Nevnt?", "Sentiment"]]
     for r in payload.get("claude_selvsjekk", []):
-        rows.append([r["prompt"], "Ja" if r["krogsveen_mentioned"] else "–", ""])
+        sentiment = r.get("sentiment") or ""
+        rows.append([r["prompt"], "Ja" if r["krogsveen_mentioned"] else "–", sentiment])
 
     rows += [["", "", ""], ["Tiltak", "Status", "Uker aktiv"]]
     for t in payload.get("tiltak", []):

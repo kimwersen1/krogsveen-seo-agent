@@ -24,7 +24,7 @@ def generate_report(settings: Settings, analysis: dict) -> str:
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key, max_retries=5)
     with client.messages.stream(
         model=settings.anthropic_model,
-        max_tokens=8000,
+        max_tokens=12000,
         system=system_prompt,
         messages=[{"role": "user", "content": user_prompt}],
     ) as stream:

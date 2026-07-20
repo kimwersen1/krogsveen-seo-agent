@@ -12,6 +12,8 @@ REPORT_FORMAT = """
       Krogsveen er fraværende fra disse kildene (det er ukjent, ikke bekreftet).
    b) Claude-selvsjekk (geo.claude_selvsjekk): hvor mange av prompt-ene nevnte Krogsveen vs.
       hvilke konkurrenter, med 1-2 konkrete eksempler. Dette ER ekte data, presenter det som det.
+      Bruk sentiment/sentiment_begrunnelse-feltene der Krogsveen er nevnt — nevn eksplisitt om
+      omtalen er positiv/nøytral/negativ og hvorfor, ikke bare at merket ble nevnt.
    c) Søkeord med ai_overview i SERP (fra Ahrefs rank tracker).
 4. Tiltaks-effekt.
 5. Avvik (>3 pos / >20 % klikk).

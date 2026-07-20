@@ -62,11 +62,23 @@ CREATE TABLE IF NOT EXISTS geo_selfcheck_weekly (
 );
 """
 
+# Kolonner lagt til etter første utrulling — CREATE TABLE IF NOT EXISTS oppdaterer ikke
+# skjemaet til en database som allerede finnes, så disse legges til eksplisitt og trygt.
+_MIGRATIONS = [
+    ("geo_selfcheck_weekly", "sentiment", "TEXT"),
+    ("geo_selfcheck_weekly", "sentiment_begrunnelse", "TEXT"),
+]
+
 
 def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.executescript(SCHEMA)
+    for table, column, col_type in _MIGRATIONS:
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+    conn.commit()
     return conn
 
 
@@ -152,8 +164,9 @@ def save_gsc_site_rows(conn: sqlite3.Connection, week_start: str, rows: list[dic
 def save_geo_selfcheck_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict]) -> None:
     conn.executemany(
         """INSERT OR REPLACE INTO geo_selfcheck_weekly
-           (week_start, prompt, krogsveen_mentioned, competitors_mentioned, response_excerpt)
-           VALUES (?, ?, ?, ?, ?)""",
+           (week_start, prompt, krogsveen_mentioned, competitors_mentioned, response_excerpt,
+            sentiment, sentiment_begrunnelse)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
         [
             (
                 week_start,
@@ -161,6 +174,8 @@ def save_geo_selfcheck_rows(conn: sqlite3.Connection, week_start: str, rows: lis
                 int(bool(r.get("krogsveen_mentioned"))),
                 json.dumps(r.get("competitors_mentioned", [])),
                 r.get("response_excerpt"),
+                r.get("sentiment"),
+                r.get("sentiment_begrunnelse"),
             )
             for r in rows
         ],

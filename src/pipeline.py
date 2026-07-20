@@ -20,7 +20,10 @@ from src.settings import Settings, load_settings
 
 logger = logging.getLogger(__name__)
 
-DASHBOARD_COMPETITORS = ["hjemla.no", "dnbeiendom.no", "eiendomsmegler1.no"]
+# Bruker hele konkurrentlisten fra config.json (var tidligere begrenset til 3 av
+# kostnadshensyn — domain-rating/site-metrics er billige nok flate kall til at alle
+# 8 er trygt innenfor ukentlig budsjett, se usage_over_budget-sjekken under).
+DASHBOARD_COMPETITORS_FALLBACK = ["hjemla.no", "dnbeiendom.no", "eiendomsmegler1.no"]
 
 
 def _date_windows(today: date) -> dict:
@@ -90,7 +93,7 @@ def run_pipeline(
         if not brand_mentions:
             data_gaps.append("Brand Radar: tomt svar — prompts er trolig ikke konfigurert i Ahrefs UI ennå.")
 
-        for competitor in DASHBOARD_COMPETITORS:
+        for competitor in (settings.competitors or DASHBOARD_COMPETITORS_FALLBACK):
             comp_dr = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat(), target=competitor)
             comp_metrics = ahrefs.get_site_metrics(settings, windows["ahrefs_date"].isoformat(), target=competitor)
             competitor_benchmark.append(

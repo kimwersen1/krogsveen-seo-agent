@@ -412,7 +412,8 @@ _TEMPLATE = r"""<!doctype html>
   var claudeHtml = '<div class="geo-item-head"><span class="title">Claude-selvsjekk</span><span class="status-chip ok">Live data</span></div>';
   (data.geo.claude_selvsjekk || []).forEach(function (r) {
     var mentioned = r.krogsveen_mentioned;
-    claudeHtml += '<div class="prompt-row"><span class="p">' + r.prompt + '</span><span class="mentioned ' + (mentioned ? "yes" : "no") + '">' + (mentioned ? "Nevnt" : "–") + '</span></div>';
+    var label = mentioned ? "Nevnt" + (r.sentiment ? " · " + r.sentiment : "") : "–";
+    claudeHtml += '<div class="prompt-row"><span class="p">' + r.prompt + '</span><span class="mentioned ' + (mentioned ? "yes" : "no") + '">' + label + '</span></div>';
   });
   claudeItem.innerHTML = claudeHtml;
   geoPanel.appendChild(claudeItem);

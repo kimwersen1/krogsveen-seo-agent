@@ -5,9 +5,10 @@ To ting sjekkes:
   1. Søkeord Krogsveen allerede rangerer på, men ikke sporer (bør legges til Rank Tracker).
   2. Søkeord konkurrenter rangerer godt på som Krogsveen ikke har synlighet på (innholdshull).
 
-KOSTNAD: en full kjøring bruker typisk 3 000–6 000 Ahrefs-enheter (se subscription-info
-før/etter i output). Dette er IKKE del av den ukentlige pipelinen — kjør manuelt eller via
-.github/workflows/keyword-discovery.yml, anbefalt månedlig, ikke oftere.
+KOSTNAD: en full kjøring med alle 8 konkurrenter fra config.json (standard) bruker typisk
+12 000–16 000 Ahrefs-enheter (se subscription-info før/etter i output) — fortsatt under
+20 % av den månedlige kvoten på 100 000. Dette er IKKE del av den ukentlige pipelinen —
+kjør manuelt eller via .github/workflows/keyword-discovery.yml, anbefalt månedlig, ikke oftere.
 
 VIKTIG BEGRENSNING: Ahrefs API har ingen endepunkt for å legge søkeord til i Rank Tracker
 (kun lesbar management-project-keywords). Denne jobben kan aldri gjøre siste steg selv —
@@ -37,7 +38,7 @@ from src.settings import load_settings  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-DEFAULT_COMPETITORS = ["hjemla.no", "dnbeiendom.no", "eiendomsmegler1.no"]
+DEFAULT_COMPETITORS_FALLBACK = ["hjemla.no", "dnbeiendom.no", "eiendomsmegler1.no"]
 
 
 def run_discovery(settings, competitors: list[str], min_volume: int) -> dict:
@@ -132,17 +133,21 @@ def format_markdown(result: dict) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Søkeordsoppdagelse utenfor Rank Tracker-listen")
-    parser.add_argument("--competitors", nargs="+", default=DEFAULT_COMPETITORS)
+    parser.add_argument(
+        "--competitors", nargs="+", default=None, help="Standard: alle konkurrenter fra config.json (8 stk)"
+    )
     parser.add_argument("--min-volume", type=int, default=200, help="Minimum søkevolum for konkurrent-hull")
     parser.add_argument("--to-drive", action="store_true", help="Skriv funnene inn i det løpende Drive-dokumentet")
     args = parser.parse_args()
 
     settings = load_settings()
+    competitors = args.competitors or settings.competitors or DEFAULT_COMPETITORS_FALLBACK
     usage_before = ahrefs.get_subscription_usage(settings)
     used_before = usage_before.get("units_usage_api_key") or usage_before.get("units_usage_workspace", 0)
     print(f"Enheter brukt før kjøring: {used_before}")
+    print(f"Konkurrenter denne kjøringen: {', '.join(competitors)}")
 
-    result = run_discovery(settings, args.competitors, args.min_volume)
+    result = run_discovery(settings, competitors, args.min_volume)
     format_console(result)
 
     usage_after = ahrefs.get_subscription_usage(settings)
