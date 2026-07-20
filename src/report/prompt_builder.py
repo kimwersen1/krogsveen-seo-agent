@@ -5,7 +5,11 @@ import json
 
 REPORT_FORMAT = """
 1. Hovedbildet (3–5 setninger).
-2. Per cluster: snittendring, antall opp/ned, topp 3 bevegelser hver vei.
+2. Per cluster: snittendring, antall opp/ned, topp 3 bevegelser hver vei. Bruk
+   organisk_fotavtrykk (bredere enn de sporede Rank Tracker-ordene — hele domenets
+   synlige søkeord per cluster) som context der det er relevant, f.eks. hvis et cluster
+   har mange usporede søkeord med god posisjon, eller påfallende få totalt — ikke behandle
+   det som samme datakilde som cluster_summaries (ingen uke-mot-uke-delta her ennå).
 3. GEO — presenter som TO ATSKILTE deler, ikke slått sammen:
    a) Brand Radar (ChatGPT/Gemini/Perplexity/AI Overviews/AI Mode): omtaler + share-of-voice.
       Hvis alt er 0 — si eksplisitt at prompts ikke er konfigurert ennå i Ahrefs UI, ikke at

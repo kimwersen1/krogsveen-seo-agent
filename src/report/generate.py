@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import anthropic
 
@@ -32,3 +33,17 @@ def generate_report(settings: Settings, analysis: dict) -> str:
     if final_message.stop_reason == "max_tokens":
         logger.warning("Rapporten ble kuttet av max_tokens-grensen — vurder å stramme inn analyse-JSON eller heve grensen ytterligere.")
     return "".join(block.text for block in final_message.content if block.type == "text")
+
+
+def extract_recommendations(report_markdown: str) -> list[str]:
+    """Plukker ut punktlisten under seksjon 6 ("Anbefaling for kommende uke") fra den
+    genererte rapportteksten, til bruk i dashboards som ikke viser hele rapportteksten
+    (se REPORT_FORMAT i prompt_builder.py — Claude instrueres til å nummerere seksjoner
+    som '## 6. ...'). Feiler stille (tom liste) hvis Claude skulle avvike fra formatet."""
+    match = re.search(r"^##\s*6\..*?$(.*?)(?=^##\s*\d|\Z)", report_markdown, re.MULTILINE | re.DOTALL)
+    if not match:
+        return []
+    bullets = re.findall(r"^[-*]\s+(.*)$", match.group(1), re.MULTILINE)
+    # Dashboards viser disse som ren tekst (ikke Docs rich-text som drive_writer.py
+    # håndterer separat) — fjern **bold**-markører i stedet for å vise dem bokstavelig.
+    return [re.sub(r"\*\*(.+?)\*\*", r"\1", b).strip() for b in bullets if b.strip()]

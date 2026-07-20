@@ -23,6 +23,7 @@ def build_dashboard_payload(
     clicks_trend: list[dict],
     competitor_benchmark: list[dict],
     report_date: date,
+    footprint_trend: list[dict] | None = None,
 ) -> dict:
     return {
         "generated": report_date.isoformat(),
@@ -35,9 +36,12 @@ def build_dashboard_payload(
         "avvik": analysis.get("avvik", [])[:15],
         "geo": analysis.get("geo", {}),
         "tiltak": analysis.get("tiltak", []),
+        "anbefaling": analysis.get("anbefaling", []),
+        "organisk_fotavtrykk": analysis.get("organisk_fotavtrykk", {}),
         "datamangler": analysis.get("datamangler", []),
         "position_trend": position_trend,
         "clicks_trend": clicks_trend,
+        "footprint_trend": footprint_trend or [],
         "competitor_benchmark": competitor_benchmark,
     }
 
@@ -60,6 +64,10 @@ def build_sheet_payload(dashboard_payload: dict) -> dict:
         "org_traffic": site_metrics.get("org_traffic"),
         "gsc_clicks": all_device.get("clicks"),
         "ai_overview_count": len(geo.get("ai_overview_sokeord", [])),
+        "ai_overview_sokeord": geo.get("ai_overview_sokeord", [])[:30],
+        "anbefaling": dashboard_payload.get("anbefaling", []),
+        "organisk_fotavtrykk_total": dashboard_payload.get("organisk_fotavtrykk", {}).get("total_sokeord"),
+        "organisk_fotavtrykk_cluster": dashboard_payload.get("organisk_fotavtrykk", {}).get("cluster_summary", []),
         "claude_mentions": sum(1 for r in claude_rows if r.get("krogsveen_mentioned")),
         "claude_total": len(claude_rows),
         "chatgpt_mentions": sum(1 for r in chatgpt_rows if r.get("krogsveen_mentioned")),
@@ -187,6 +195,10 @@ _TEMPLATE = r"""<!doctype html>
   .cluster-delta.up { color: var(--good); }
   .cluster-delta.down { color: var(--critical); }
   .cluster-delta.flat { color: var(--ink-muted); }
+  .footprint-row { display: grid; grid-template-columns: 1fr 90px 90px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .footprint-row:last-child { border-bottom: none; }
+  .footprint-row .name { font-weight: 600; }
+  .footprint-row .count, .footprint-row .pos { text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
   .geo-item { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
   .geo-item:last-child { margin-bottom: 0; }
   .geo-item-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 5px; }
@@ -231,6 +243,12 @@ _TEMPLATE = r"""<!doctype html>
 
   <div class="stat-grid" id="stat-grid"></div>
 
+  <div class="card" id="anbefaling-card" style="display:none">
+    <h2>Anbefaling for neste uke</h2>
+    <div class="card-sub">Hentet fra ukens rapporttekst</div>
+    <ul id="anbefaling-list" style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px;"></ul>
+  </div>
+
   <div class="two-col">
     <div class="card">
       <h2>Snittposisjon over tid</h2>
@@ -248,6 +266,18 @@ _TEMPLATE = r"""<!doctype html>
     <h2>Cluster-bevegelse denne uken</h2>
     <div class="card-sub" id="cluster-sub"></div>
     <div id="cluster-rows"></div>
+  </div>
+
+  <div class="card">
+    <h2>Organisk fotavtrykk</h2>
+    <div class="card-sub" id="footprint-sub">Bredere enn de 338 sporede Rank Tracker-ordene — hele domenets synlige søkeord (topp 50 posisjon)</div>
+    <div id="footprint-rows"></div>
+  </div>
+
+  <div class="card">
+    <h2>Søkeord med AI Overview i SERP</h2>
+    <div class="card-sub" id="ai-overview-sub"></div>
+    <div id="ai-overview-list"></div>
   </div>
 
   <div class="two-col">
@@ -321,6 +351,32 @@ _TEMPLATE = r"""<!doctype html>
   var claudeMentions = (data.geo.claude_selvsjekk || []).filter(function (r) { return r.krogsveen_mentioned; }).length;
   var claudeTotal = (data.geo.claude_selvsjekk || []).length;
   addStat("Claude nevner Krogsveen", claudeMentions + " / " + claudeTotal, "av kjørte GEO-prompts");
+
+  // ---- Anbefaling for neste uke ----
+  var anbefaling = data.anbefaling || [];
+  if (anbefaling.length) {
+    document.getElementById("anbefaling-card").style.display = "";
+    var anbefalingList = document.getElementById("anbefaling-list");
+    anbefaling.forEach(function (point) {
+      var li = document.createElement("li");
+      li.textContent = point;
+      anbefalingList.appendChild(li);
+    });
+  }
+
+  // ---- AI Overview-søkeord ----
+  var aiRows = data.geo.ai_overview_sokeord || [];
+  document.getElementById("ai-overview-sub").textContent = aiRows.length + " søkeord denne uken (desktop)";
+  var aiList = document.getElementById("ai-overview-list");
+  aiRows.forEach(function (r) {
+    var row = document.createElement("div");
+    row.className = "prompt-row";
+    row.innerHTML = '<span class="p">' + r.keyword + '</span><span class="mentioned">' + (r.clusters || []).join(", ") + '</span>';
+    aiList.appendChild(row);
+  });
+  if (!aiRows.length) {
+    aiList.innerHTML = '<div class="empty-note">Ingen søkeord med AI Overview denne uken</div>';
+  }
 
   // ---- Trend charts (single-series, simple) ----
   function renderTrendChart(containerId, points, valueKey, color, label) {
@@ -400,6 +456,25 @@ _TEMPLATE = r"""<!doctype html>
       '<span class="cluster-delta ' + deltaClass + '">' + sign + c.avg_position_delta.toFixed(1) + '</span>';
     clusterWrap.appendChild(row);
   });
+
+  // ---- Organisk fotavtrykk ----
+  var footprint = data.organisk_fotavtrykk || {};
+  var footprintWrap = document.getElementById("footprint-rows");
+  var footprintTotal = footprint.total_sokeord || 0;
+  document.getElementById("footprint-sub").textContent =
+    footprintTotal + " søkeord i topp 50 (hele domenet) — bredere enn de " + totalTracked + " sporede Rank Tracker-ordene";
+  (footprint.cluster_summary || []).forEach(function (c) {
+    var row = document.createElement("div");
+    row.className = "footprint-row";
+    row.innerHTML =
+      '<span class="name">' + c.name + '</span>' +
+      '<span class="count">' + c.keyword_count + ' søkeord</span>' +
+      '<span class="pos">' + (c.avg_position != null ? "pos " + c.avg_position : "–") + '</span>';
+    footprintWrap.appendChild(row);
+  });
+  if (!footprintTotal) {
+    footprintWrap.innerHTML = '<div class="empty-note">Ingen data denne uken (budsjett-hopp over eller første kjøring)</div>';
+  }
 
   // ---- GEO panel ----
   var geoPanel = document.getElementById("geo-panel");

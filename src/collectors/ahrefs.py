@@ -318,3 +318,46 @@ def get_organic_keywords_for_list(
     }
     data = _get(settings, "site-explorer/organic-keywords", params)
     return data.get("keywords", [])
+
+
+def get_organic_keywords_paginated(
+    settings: Settings,
+    target: str,
+    date: str,
+    country: str = "no",
+    position_max: int = 50,
+    max_rows: int = 1500,
+    per_position_limit: int = 100,
+) -> list[dict]:
+    """Som get_organic_keywords, men henter forbi den samme 100-rader-capen som
+    rank-tracker/overview har (se der for detaljer om begrensningen). Alltid
+    with_metrics=False — billig (~2 enheter/rad), brukt til bredde-kartlegging (hele det
+    organiske fotavtrykket, ikke kun de 338 manuelt sporede Rank Tracker-ordene).
+
+    Spør én eksakt posisjon om gangen (where best_position eq N, N = 1..position_max) i
+    stedet for keyset-paginering med et voksende 'neq'-tie-break-sett — sistnevnte fikk
+    Ahrefs API til å svare 500 internal server error i praksis (20.07.2026), fordi
+    Krogsveen har hundrevis av adressespesifikke long-tail-søkeord som alle rangerer
+    posisjon 1 (egne annonse-/prisstatistikksider), og where-klausulen ble for kompleks.
+    Cappet på per_position_limit rader PER posisjon — ikke garantert uttømmende for
+    svært tiede posisjoner, men gir et representativt bredde-bilde uten å krasje.
+    """
+    all_rows: list[dict] = []
+    for pos in range(1, position_max + 1):
+        if len(all_rows) >= max_rows:
+            break
+        params = {
+            "select": "keyword,best_position,best_position_url",
+            "target": target,
+            "mode": "subdomains",
+            "country": country,
+            "date": date,
+            "where": json.dumps({"field": "best_position", "is": ["eq", pos]}),
+            "limit": per_position_limit,
+            "output": "json",
+        }
+        data = _get(settings, "site-explorer/organic-keywords", params)
+        all_rows.extend(data.get("keywords", []))
+
+    logger.info("organic-keywords (%s, paginert per posisjon): %d rader", target, len(all_rows))
+    return all_rows[:max_rows]
