@@ -5,6 +5,7 @@ import logging
 from datetime import date, timedelta
 from pathlib import Path
 
+import openai
 from googleapiclient.errors import HttpError
 
 from src.analysis import clusters as cluster_analysis
@@ -166,11 +167,18 @@ def run_pipeline(
     geo_selfcheck = claude_geo.check_geo_visibility(settings)
     storage.save_geo_selfcheck_rows(conn, week_start_label, geo_selfcheck, source="claude")
 
-    chatgpt_selfcheck = chatgpt_geo.check_geo_visibility(settings)
-    if chatgpt_selfcheck:
-        storage.save_geo_selfcheck_rows(conn, week_start_label, chatgpt_selfcheck, source="chatgpt")
-    elif not settings.openai_api_key:
-        data_gaps.append("ChatGPT-selvsjekk hoppet over — OPENAI_API_KEY er ikke satt i .env.")
+    try:
+        chatgpt_selfcheck = chatgpt_geo.check_geo_visibility(settings)
+    except openai.OpenAIError as exc:
+        # F.eks. manglende fakturering (insufficient_quota) eller rate-limit — dette skal
+        # aldri velte hele ukesrapporten, kun noteres som et datahull (se 20.07.2026-hendelsen).
+        chatgpt_selfcheck = []
+        data_gaps.append(f"ChatGPT-selvsjekk feilet ({exc}). Sjekk API-nøkkel/fakturering på platform.openai.com.")
+    else:
+        if chatgpt_selfcheck:
+            storage.save_geo_selfcheck_rows(conn, week_start_label, chatgpt_selfcheck, source="chatgpt")
+        elif not settings.openai_api_key:
+            data_gaps.append("ChatGPT-selvsjekk hoppet over — OPENAI_API_KEY er ikke satt i .env.")
 
     tagged_desktop = cluster_analysis.tag_rows(rank_desktop, settings.clusters)
     cluster_summaries = diff_analysis.summarize_all_clusters(tagged_desktop, list(settings.clusters.keys()))
