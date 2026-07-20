@@ -47,6 +47,7 @@ def build_sheet_payload(dashboard_payload: dict) -> dict:
     (se src/report/sheets_writer.py) — samme kildedata, enklere struktur."""
     geo = dashboard_payload.get("geo", {})
     claude_rows = geo.get("claude_selvsjekk", [])
+    chatgpt_rows = geo.get("chatgpt_selvsjekk", [])
     site_metrics = dashboard_payload.get("site_metrics") or {}
     domain_rating = dashboard_payload.get("domain_rating") or {}
     all_device = next((r for r in dashboard_payload.get("gsc_site", []) if r.get("device") == "all"), {})
@@ -61,11 +62,14 @@ def build_sheet_payload(dashboard_payload: dict) -> dict:
         "ai_overview_count": len(geo.get("ai_overview_sokeord", [])),
         "claude_mentions": sum(1 for r in claude_rows if r.get("krogsveen_mentioned")),
         "claude_total": len(claude_rows),
+        "chatgpt_mentions": sum(1 for r in chatgpt_rows if r.get("krogsveen_mentioned")),
+        "chatgpt_total": len(chatgpt_rows),
         "avg_position": (
             dashboard_payload["position_trend"][-1]["avg_position"] if dashboard_payload.get("position_trend") else None
         ),
         "cluster_summaries": dashboard_payload.get("cluster_summaries", []),
         "claude_selvsjekk": claude_rows,
+        "chatgpt_selvsjekk": chatgpt_rows,
         "tiltak": dashboard_payload.get("tiltak", []),
         "competitor_benchmark": dashboard_payload.get("competitor_benchmark", []),
     }
@@ -154,7 +158,7 @@ _TEMPLATE = r"""<!doctype html>
   .chip.ok .dot { background: var(--good); }
   .chip.blocked { color: var(--critical); background: var(--critical-soft); border-color: color-mix(in srgb, var(--critical) 40%, var(--line-strong)); }
   .chip.blocked .dot { background: var(--critical); }
-  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .stat-tile { background: var(--bg-surface); padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 5px; }
   .stat-tile .label { font-size: 11.5px; color: var(--ink-muted); }
   .stat-tile .value { font-size: 24px; font-weight: 600; }
@@ -407,16 +411,22 @@ _TEMPLATE = r"""<!doctype html>
     '<p>' + (brandRadarOk ? "Data flyter fra ChatGPT/Gemini/Perplexity/AI Overviews/AI Mode." : "Prompts mangler i Ahrefs UI — datakildene er satt til ukentlig, men ingen spørsmål er lagt inn ennå.") + '</p>';
   geoPanel.appendChild(brandItem);
 
-  var claudeItem = document.createElement("div");
-  claudeItem.className = "geo-item";
-  var claudeHtml = '<div class="geo-item-head"><span class="title">Claude-selvsjekk</span><span class="status-chip ok">Live data</span></div>';
-  (data.geo.claude_selvsjekk || []).forEach(function (r) {
-    var mentioned = r.krogsveen_mentioned;
-    var label = mentioned ? "Nevnt" + (r.sentiment ? " · " + r.sentiment : "") : "–";
-    claudeHtml += '<div class="prompt-row"><span class="p">' + r.prompt + '</span><span class="mentioned ' + (mentioned ? "yes" : "no") + '">' + label + '</span></div>';
-  });
-  claudeItem.innerHTML = claudeHtml;
-  geoPanel.appendChild(claudeItem);
+  function renderSelfcheckPanel(title, rows) {
+    var item = document.createElement("div");
+    item.className = "geo-item";
+    var html = '<div class="geo-item-head"><span class="title">' + title + '</span><span class="status-chip ok">Live data</span></div>';
+    rows.forEach(function (r) {
+      var mentioned = r.krogsveen_mentioned;
+      var label = mentioned ? "Nevnt" + (r.sentiment ? " · " + r.sentiment : "") : "–";
+      html += '<div class="prompt-row"><span class="p">' + r.prompt + '</span><span class="mentioned ' + (mentioned ? "yes" : "no") + '">' + label + '</span></div>';
+    });
+    item.innerHTML = html;
+    geoPanel.appendChild(item);
+  }
+  renderSelfcheckPanel("Claude-selvsjekk", data.geo.claude_selvsjekk || []);
+  if ((data.geo.chatgpt_selvsjekk || []).length) {
+    renderSelfcheckPanel("ChatGPT-selvsjekk", data.geo.chatgpt_selvsjekk);
+  }
 
   // ---- Competitor table ----
   var compBody = document.querySelector("#competitor-table tbody");

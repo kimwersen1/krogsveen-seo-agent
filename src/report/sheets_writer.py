@@ -162,6 +162,13 @@ def update_dashboard_sheet(settings: Settings, payload: dict) -> str:
         sentiment = r.get("sentiment") or ""
         rows.append([r["prompt"], "Ja" if r["krogsveen_mentioned"] else "–", sentiment])
 
+    chatgpt_rows = payload.get("chatgpt_selvsjekk", [])
+    if chatgpt_rows:
+        rows += [["", "", ""], ["GEO-prompt (ChatGPT)", "Nevnt?", "Sentiment"]]
+        for r in chatgpt_rows:
+            sentiment = r.get("sentiment") or ""
+            rows.append([r["prompt"], "Ja" if r["krogsveen_mentioned"] else "–", sentiment])
+
     rows += [["", "", ""], ["Tiltak", "Status", "Uker aktiv"]]
     for t in payload.get("tiltak", []):
         rows.append([t.get("side", ""), t.get("status_vurdering", ""), t.get("uker_aktiv", "")])

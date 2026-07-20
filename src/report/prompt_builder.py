@@ -14,7 +14,11 @@ REPORT_FORMAT = """
       hvilke konkurrenter, med 1-2 konkrete eksempler. Dette ER ekte data, presenter det som det.
       Bruk sentiment/sentiment_begrunnelse-feltene der Krogsveen er nevnt — nevn eksplisitt om
       omtalen er positiv/nøytral/negativ og hvorfor, ikke bare at merket ble nevnt.
-   c) Søkeord med ai_overview i SERP (fra Ahrefs rank tracker).
+   c) ChatGPT-selvsjekk (geo.chatgpt_selvsjekk) — samme metode, samme prompts, mot OpenAI.
+      Tom liste betyr ikke konfigurert (ingen OPENAI_API_KEY), ikke at ChatGPT ble sjekket
+      og ikke fant noe — vær presis på denne forskjellen. Hvis begge selvsjekkene har data,
+      trekk gjerne fram hvis Claude og ChatGPT er uenige om Krogsveen nevnes eller ikke.
+   d) Søkeord med ai_overview i SERP (fra Ahrefs rank tracker).
 4. Tiltaks-effekt.
 5. Avvik (>3 pos / >20 % klikk).
 6. Anbefaling for kommende uke (2–3 punkter).

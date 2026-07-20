@@ -54,30 +54,55 @@ CREATE TABLE IF NOT EXISTS gsc_site_weekly (
 
 CREATE TABLE IF NOT EXISTS geo_selfcheck_weekly (
     week_start TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'claude',
     prompt TEXT NOT NULL,
     krogsveen_mentioned INTEGER,
     competitors_mentioned TEXT,
     response_excerpt TEXT,
-    PRIMARY KEY (week_start, prompt)
+    sentiment TEXT,
+    sentiment_begrunnelse TEXT,
+    PRIMARY KEY (week_start, source, prompt)
 );
 """
 
-# Kolonner lagt til etter første utrulling — CREATE TABLE IF NOT EXISTS oppdaterer ikke
-# skjemaet til en database som allerede finnes, så disse legges til eksplisitt og trygt.
-_MIGRATIONS = [
-    ("geo_selfcheck_weekly", "sentiment", "TEXT"),
-    ("geo_selfcheck_weekly", "sentiment_begrunnelse", "TEXT"),
-]
+
+def _migrate_geo_selfcheck_source_column(conn: sqlite3.Connection) -> None:
+    """geo_selfcheck_weekly sin PRIMARY KEY måtte utvides til å inkludere 'source' for å
+    støtte flere LLM-leverandører (Claude, ChatGPT, ...) uten kollisjon på samme prompt
+    samme uke. SQLite kan ikke endre en PRIMARY KEY via ALTER TABLE, så eksisterende
+    tabell (fra før ChatGPT-støtte, alle rader var Claude) migreres via ny tabell + kopi.
+    Databasen hadde kun noen få dagers testdata da dette ble skrevet — trygt å migrere."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(geo_selfcheck_weekly)").fetchall()}
+    if "source" in columns or not columns:
+        return  # allerede ny, eller tabellen finnes ikke ennå (frisk database)
+    conn.executescript(
+        """
+        ALTER TABLE geo_selfcheck_weekly RENAME TO geo_selfcheck_weekly_old;
+        CREATE TABLE geo_selfcheck_weekly (
+            week_start TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'claude',
+            prompt TEXT NOT NULL,
+            krogsveen_mentioned INTEGER,
+            competitors_mentioned TEXT,
+            response_excerpt TEXT,
+            sentiment TEXT,
+            sentiment_begrunnelse TEXT,
+            PRIMARY KEY (week_start, source, prompt)
+        );
+        INSERT INTO geo_selfcheck_weekly
+            (week_start, source, prompt, krogsveen_mentioned, competitors_mentioned, response_excerpt)
+        SELECT week_start, 'claude', prompt, krogsveen_mentioned, competitors_mentioned, response_excerpt
+        FROM geo_selfcheck_weekly_old;
+        DROP TABLE geo_selfcheck_weekly_old;
+        """
+    )
 
 
 def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
+    _migrate_geo_selfcheck_source_column(conn)
     conn.executescript(SCHEMA)
-    for table, column, col_type in _MIGRATIONS:
-        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
-        if column not in existing:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
     conn.commit()
     return conn
 
@@ -161,15 +186,16 @@ def save_gsc_site_rows(conn: sqlite3.Connection, week_start: str, rows: list[dic
     conn.commit()
 
 
-def save_geo_selfcheck_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict]) -> None:
+def save_geo_selfcheck_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict], source: str = "claude") -> None:
     conn.executemany(
         """INSERT OR REPLACE INTO geo_selfcheck_weekly
-           (week_start, prompt, krogsveen_mentioned, competitors_mentioned, response_excerpt,
+           (week_start, source, prompt, krogsveen_mentioned, competitors_mentioned, response_excerpt,
             sentiment, sentiment_begrunnelse)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             (
                 week_start,
+                source,
                 r.get("prompt"),
                 int(bool(r.get("krogsveen_mentioned"))),
                 json.dumps(r.get("competitors_mentioned", [])),

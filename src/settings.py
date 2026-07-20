@@ -37,6 +37,8 @@ class Settings:
     google_dashboard_sheet_name: str
     anthropic_api_key: str
     anthropic_model: str
+    openai_api_key: str
+    openai_model: str
     clusters: dict = field(default_factory=dict)
     config: dict = field(default_factory=dict)
     tiltak: list = field(default_factory=list)
@@ -69,6 +71,10 @@ def load_settings() -> Settings:
         google_dashboard_sheet_name=os.environ.get("GOOGLE_DASHBOARD_SHEET_NAME", "SEO-dashboard Krogsveen"),
         anthropic_api_key=_require("ANTHROPIC_API_KEY"),
         anthropic_model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+        # Valgfritt — ChatGPT-selvsjekken (src/collectors/chatgpt_geo.py) hopper
+        # stille over seg selv hvis denne mangler, i motsetning til Anthropic-nøkkelen.
+        openai_api_key=os.environ.get("OPENAI_API_KEY", "").strip(),
+        openai_model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
         clusters=_load_json("clusters.json"),
         config=_load_json("config.json"),
         tiltak=_load_json("tiltak.json"),

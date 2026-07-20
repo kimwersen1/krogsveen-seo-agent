@@ -11,7 +11,7 @@ from src.analysis import clusters as cluster_analysis
 from src.analysis import diffs as diff_analysis
 from src.analysis import geo as geo_analysis
 from src.analysis import tiltak as tiltak_analysis
-from src.collectors import ahrefs, claude_geo, gsc, storage
+from src.collectors import ahrefs, chatgpt_geo, claude_geo, gsc, storage
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
 from src.report.generate import generate_report
@@ -164,7 +164,13 @@ def run_pipeline(
         storage.save_brand_radar_rows(conn, week_start_label, list(merged_brand_rows.values()))
 
     geo_selfcheck = claude_geo.check_geo_visibility(settings)
-    storage.save_geo_selfcheck_rows(conn, week_start_label, geo_selfcheck)
+    storage.save_geo_selfcheck_rows(conn, week_start_label, geo_selfcheck, source="claude")
+
+    chatgpt_selfcheck = chatgpt_geo.check_geo_visibility(settings)
+    if chatgpt_selfcheck:
+        storage.save_geo_selfcheck_rows(conn, week_start_label, chatgpt_selfcheck, source="chatgpt")
+    elif not settings.openai_api_key:
+        data_gaps.append("ChatGPT-selvsjekk hoppet over — OPENAI_API_KEY er ikke satt i .env.")
 
     tagged_desktop = cluster_analysis.tag_rows(rank_desktop, settings.clusters)
     cluster_summaries = diff_analysis.summarize_all_clusters(tagged_desktop, list(settings.clusters.keys()))
@@ -198,6 +204,7 @@ def run_pipeline(
             "brand_radar_omtaler": mentions_summary,
             "brand_radar_siterte_sider": cited_pages,
             "claude_selvsjekk": geo_selfcheck,
+            "chatgpt_selvsjekk": chatgpt_selfcheck,
         },
         "tiltak": tiltak_status,
         "konkurrenter": settings.competitors,
