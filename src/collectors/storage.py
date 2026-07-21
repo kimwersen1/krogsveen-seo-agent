@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS geo_selfcheck_weekly (
     source TEXT NOT NULL DEFAULT 'claude',
     prompt TEXT NOT NULL,
     krogsveen_mentioned INTEGER,
+    krogsveen_cited INTEGER,
     competitors_mentioned TEXT,
     response_excerpt TEXT,
     sentiment TEXT,
@@ -114,11 +115,22 @@ def _migrate_geo_selfcheck_source_column(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_geo_selfcheck_cited_column(conn: sqlite3.Connection) -> None:
+    """krogsveen_cited (kun brukt av Perplexity-selvsjekken — sitat-URL, ikke bare
+    tekstnevnelse) lagt til 21.07.2026. Enkel ADD COLUMN holder siden dette ikke
+    rører PRIMARY KEY (i motsetning til source-migreringen over)."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(geo_selfcheck_weekly)").fetchall()}
+    if not columns or "krogsveen_cited" in columns:
+        return
+    conn.execute("ALTER TABLE geo_selfcheck_weekly ADD COLUMN krogsveen_cited INTEGER")
+
+
 def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     _migrate_geo_selfcheck_source_column(conn)
     conn.executescript(SCHEMA)
+    _migrate_geo_selfcheck_cited_column(conn)
     conn.commit()
     return conn
 
@@ -205,15 +217,16 @@ def save_gsc_site_rows(conn: sqlite3.Connection, week_start: str, rows: list[dic
 def save_geo_selfcheck_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict], source: str = "claude") -> None:
     conn.executemany(
         """INSERT OR REPLACE INTO geo_selfcheck_weekly
-           (week_start, source, prompt, krogsveen_mentioned, competitors_mentioned, response_excerpt,
-            sentiment, sentiment_begrunnelse)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+           (week_start, source, prompt, krogsveen_mentioned, krogsveen_cited, competitors_mentioned,
+            response_excerpt, sentiment, sentiment_begrunnelse)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             (
                 week_start,
                 source,
                 r.get("prompt"),
                 int(bool(r.get("krogsveen_mentioned"))),
+                int(bool(r.get("krogsveen_cited"))) if "krogsveen_cited" in r else None,
                 json.dumps(r.get("competitors_mentioned", [])),
                 r.get("response_excerpt"),
                 r.get("sentiment"),

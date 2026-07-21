@@ -6,13 +6,14 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import openai
+from google.genai.errors import APIError as GeminiAPIError
 from googleapiclient.errors import HttpError
 
 from src.analysis import clusters as cluster_analysis
 from src.analysis import diffs as diff_analysis
 from src.analysis import geo as geo_analysis
 from src.analysis import tiltak as tiltak_analysis
-from src.collectors import ahrefs, chatgpt_geo, claude_geo, gsc, gsc_oauth, storage
+from src.collectors import ahrefs, chatgpt_geo, claude_geo, gemini_geo, gsc, gsc_oauth, perplexity_geo, storage
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
 from src.report.generate import extract_recommendations, generate_report
@@ -205,6 +206,31 @@ def run_pipeline(
         elif not settings.openai_api_key:
             data_gaps.append("ChatGPT-selvsjekk hoppet over — OPENAI_API_KEY er ikke satt i .env.")
 
+    # Gemini + Perplexity dekker to av Brand Radar sine fem datakilder direkte (Ahrefs
+    # sin versjon var begrenset til 5 prompts totalt uten skriv-API for rotasjon —
+    # besluttet erstattet 21.07.2026). Samme robusthetsmønster som ChatGPT over.
+    try:
+        gemini_selfcheck = gemini_geo.check_geo_visibility(settings)
+    except GeminiAPIError as exc:
+        gemini_selfcheck = []
+        data_gaps.append(f"Gemini-selvsjekk feilet ({exc}). Sjekk API-nøkkel på aistudio.google.com.")
+    else:
+        if gemini_selfcheck:
+            storage.save_geo_selfcheck_rows(conn, week_start_label, gemini_selfcheck, source="gemini")
+        elif not settings.gemini_api_key:
+            data_gaps.append("Gemini-selvsjekk hoppet over — GEMINI_API_KEY er ikke satt i .env.")
+
+    try:
+        perplexity_selfcheck = perplexity_geo.check_geo_visibility(settings)
+    except openai.OpenAIError as exc:
+        perplexity_selfcheck = []
+        data_gaps.append(f"Perplexity-selvsjekk feilet ({exc}). Sjekk API-nøkkel/fakturering på perplexity.ai.")
+    else:
+        if perplexity_selfcheck:
+            storage.save_geo_selfcheck_rows(conn, week_start_label, perplexity_selfcheck, source="perplexity")
+        elif not settings.perplexity_api_key:
+            data_gaps.append("Perplexity-selvsjekk hoppet over — PERPLEXITY_API_KEY er ikke satt i .env.")
+
     tagged_desktop = cluster_analysis.tag_rows(rank_desktop, settings.clusters)
     cluster_summaries = diff_analysis.summarize_all_clusters(tagged_desktop, list(settings.clusters.keys()))
     anomalies = diff_analysis.detect_anomalies(
@@ -257,6 +283,8 @@ def run_pipeline(
             "brand_radar_siterte_sider": cited_pages,
             "claude_selvsjekk": geo_selfcheck,
             "chatgpt_selvsjekk": chatgpt_selfcheck,
+            "gemini_selvsjekk": gemini_selfcheck,
+            "perplexity_selvsjekk": perplexity_selfcheck,
         },
         "tiltak": tiltak_status,
         "konkurrenter": settings.competitors,

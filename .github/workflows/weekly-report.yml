@@ -58,6 +58,14 @@ jobs:
           # finnes ville satt env-variabelen til en tom streng (ikke "usatt"), som
           # overstyrer Python sin default og feiler mot Search Console API (skjedde
           # 21.07.2026: 'http://' is not a valid Search Console site URL).
+          #
+          # Valgfrie — del av erstatningen for Ahrefs Brand Radar. Hopper stille over seg
+          # selv uten nøkkel (settings._optional() håndterer tom-streng-secret-fallen nevnt
+          # over, trygt å referere disse selv om secreten ikke finnes).
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          PERPLEXITY_MODEL: ${{ secrets.PERPLEXITY_MODEL }}
         run: python scripts/run_weekly.py
 
       # data/history.db er unntatt fra .gitignore med vilje — uten dette starter hver

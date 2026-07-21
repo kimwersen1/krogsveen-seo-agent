@@ -53,6 +53,10 @@ class Settings:
     google_oauth_client_secret: str
     google_oauth_refresh_token: str
     google_search_console_property: str
+    gemini_api_key: str
+    gemini_model: str
+    perplexity_api_key: str
+    perplexity_model: str
     clusters: dict = field(default_factory=dict)
     config: dict = field(default_factory=dict)
     tiltak: list = field(default_factory=list)
@@ -102,6 +106,12 @@ def load_settings() -> Settings:
         google_oauth_client_secret=_optional("GOOGLE_OAUTH_CLIENT_SECRET"),
         google_oauth_refresh_token=_optional("GOOGLE_OAUTH_REFRESH_TOKEN"),
         google_search_console_property=_optional("GOOGLE_SEARCH_CONSOLE_PROPERTY", "sc-domain:krogsveen.no"),
+        # Valgfrie — del av erstatningen for Ahrefs Brand Radar (21.07.2026), samme
+        # mønster som ChatGPT-selvsjekken: hopper stille over seg selv uten nøkkel.
+        gemini_api_key=_optional("GEMINI_API_KEY"),
+        gemini_model=_optional("GEMINI_MODEL", "gemini-2.0-flash"),
+        perplexity_api_key=_optional("PERPLEXITY_API_KEY"),
+        perplexity_model=_optional("PERPLEXITY_MODEL", "sonar"),
         clusters=_load_json("clusters.json"),
         config=_load_json("config.json"),
         tiltak=_load_json("tiltak.json"),
