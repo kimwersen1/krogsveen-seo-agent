@@ -12,7 +12,9 @@ from src.analysis import clusters as cluster_analysis
 from src.analysis import diffs as diff_analysis
 from src.analysis import geo as geo_analysis
 from src.analysis import tiltak as tiltak_analysis
+from src.analysis.keyword_gap import find_untracked_ranking_keywords
 from src.collectors import ahrefs, chatgpt_geo, claude_geo, gsc, storage
+from src.report.content_suggestions import parse_bullets, suggest_content
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
 from src.report.generate import extract_recommendations, generate_report
@@ -208,6 +210,14 @@ def run_pipeline(
     )
     footprint_trend = storage.get_organic_footprint_trend(conn, weeks=12)
 
+    # Gratis (gjenbruker footprint-data over) ukentlig innholdsforslag i dashboard —
+    # kun untracked-siden av gap-analysen, ikke de dyrere konkurrent-sammenligningene
+    # (de kjøres i stedet to ganger i måneden via scripts/keyword_discovery.py --to-drive).
+    tracked_keywords = {r["keyword"] for r in rank_desktop if r.get("keyword")}
+    weekly_untracked = find_untracked_ranking_keywords(tagged_footprint, tracked_keywords, settings.clusters)
+    content_suggestions_markdown = suggest_content(settings, weekly_untracked, [])
+    content_suggestions = parse_bullets(content_suggestions_markdown)
+
     conn.close()
 
     analysis = {
@@ -233,6 +243,7 @@ def run_pipeline(
         },
         "tiltak": tiltak_status,
         "konkurrenter": settings.competitors,
+        "innholdsforslag": content_suggestions,
         "datamangler": data_gaps,
     }
 

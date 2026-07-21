@@ -1,25 +1,54 @@
 """Bruker Claude til å foreslå konkrete artikkel-/sideideer basert på søkeordsgap
 funnet av src/analysis/keyword_gap.py (untracked + competitor gap keywords).
 
-Kjøres kun av scripts/keyword_discovery.py (månedlig), ikke del av den ukentlige
-pipelinen — dette er en tolkning av gap-listen, ikke en kostnadsfri deterministisk
-transformasjon som resten av discovery-scriptet.
+To bruksmønstre:
+  1. Ukentlig, i pipeline.py: kun untracked-listen (gratis — gjenbruker allerede
+     hentet organisk-fotavtrykk-data), lette forslag vist i dashboard.
+  2. To ganger i måneden, i scripts/keyword_discovery.py --to-drive: untracked + dyrere
+     konkurrent-gap-data, fyldigere forslag skrevet til det løpende Drive-dokumentet.
 """
 from __future__ import annotations
+
+import re
 
 import anthropic
 
 from src.settings import Settings
 
-SYSTEM_PROMPT = """Du er en SEO-innholdsstrateg for krogsveen.no, en norsk eiendomsmegler.
+# Basert på faktisk gjennomgang av krogsveen.no (21.07.2026) — se to reelle, men ulike
+# mønstre på sitet i dag: magasinartikler (narrativ prosa, ekte navngitte
+# meglere/kontorsjefer sitert med tittel, "vi/du"-tone, ingen eksplisitt spørsmål-
+# struktur) vs. transaksjonssider som /e-takst (sterk "Hva er X? / Hvor lenge er X
+# gyldig?"-struktur, punktlister, klar prising — mye mer GEO/AI Overview-vennlig fordi
+# LLM-er og Googles AI-sammendrag lettere trekker ut rene spørsmål-svar-par).
+TONE_OF_VOICE = """Krogsveens tone: varm, rådgivende, "vi/du" — snakker til leseren som et
+menneske med en reell beslutning foran seg, ikke som et salgsobjekt. Selger ikke Krogsveen
+direkte i brødteksten (ingen "bestill hos oss nå"-CTA-er midt i teksten) — tillit bygges
+gjennom konkrete, ærlige råd, ofte med et sitat fra en navngitt megler eller kontorsjef med
+tittel og kontor (f.eks. "Therese Thon Andreassen, daglig leder i Krogsveen Tønsberg").
+Overskrifter er innsikt, ikke etiketter ("Lokalkunnskap gir et bedre utgangspunkt", ikke
+"Om lokalkunnskap"). Avslutter gjerne med en kort tillits-appellerende oppsummering.
+
+Strukturell svakhet å rette opp i nye forslag: dagens magasinartikler er ren narrativ
+prosa uten eksplisitte spørsmål-overskrifter, mens sider som /e-takst allerede viser at
+Krogsveen kan skrive god Q&A-struktur når de vil. Nye artikkelforslag bør derfor inkludere
+minst 2-3 eksplisitte spørsmålsoverskrifter som matcher reelle søkefraser (f.eks. "Hvor mye
+koster e-takst?", "Hvor lenge er en e-takst gyldig?") i tillegg til den varme narrative
+tonen — ikke bytte den ut."""
+
+SYSTEM_PROMPT = f"""Du er en SEO/GEO-innholdsstrateg for krogsveen.no, en norsk eiendomsmegler.
 Du får en liste søkeord Krogsveen enten rangerer på uten å spore det i Rank Tracker, eller
 helt mangler synlighet på sammenlignet med navngitte konkurrenter.
 
-Foreslå 5-8 konkrete artikkel-/sideideer basert på dette. For hvert forslag:
+{TONE_OF_VOICE}
+
+Foreslå 5-8 konkrete artikkel-/sideideer basert på søkeordslisten. For hvert forslag:
 - En kort, konkret tittel (ikke generisk "guide om boligsalg")
 - Hvilke søkeord fra listen den dekker
 - Én setning om vinkling — hvorfor denne siden dekker brukerens behov bedre enn det
   som finnes i dag, eller hvorfor det er et reelt hull
+- Én setning om struktur — nevn spesifikt hvilke spørsmålsoverskrifter forslaget bør ha,
+  matchet mot tone-of-voice-notatet over
 
 Skriv på norsk, som en markdown-punktliste, ingen innledning eller avslutning.
 Prioriter forslag med høyest samlet søkevolum og tydeligst cluster-tilhørighet."""
@@ -53,3 +82,11 @@ def suggest_content(settings: Settings, untracked: list[dict], gaps: list[dict])
     ) as stream:
         final_message = stream.get_final_message()
     return "".join(block.text for block in final_message.content if block.type == "text")
+
+
+def parse_bullets(markdown_text: str) -> list[str]:
+    """Plukker ut punktlisten fra suggest_content sin markdown-respons, med
+    **bold**-markører fjernet — til bruk i dashboards som viser ren tekst i stedet for
+    Docs rich-text (samme mønster som generate.extract_recommendations)."""
+    bullets = re.findall(r"^[-*]\s+(.*)$", markdown_text, re.MULTILINE)
+    return [re.sub(r"\*\*(.+?)\*\*", r"\1", b).strip() for b in bullets if b.strip()]

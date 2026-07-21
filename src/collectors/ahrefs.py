@@ -8,6 +8,8 @@ import json
 import logging
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from src.settings import Settings
 
@@ -17,6 +19,15 @@ BASE_URL = "https://api.ahrefs.com/v3"
 
 RANK_TRACKER_SELECT = "keyword,position,position_prev,volume,url,serp_features"
 BRAND_RADAR_DATA_SOURCES = "chatgpt,gemini,perplexity,google_ai_overviews,google_ai_mode"
+
+# I motsetning til Anthropic/OpenAI-klientene (max_retries=5) hadde disse rå requests-
+# kallene ingen retry-logikk — en ren nettverksblunk (ConnectionResetError) veltet hele
+# ukeskjøringen i praksis (20.07.2026). Retry på tilkoblingsfeil og forbigående 5xx,
+# IKKE på 4xx (de er reelle API-feil, f.eks. ugyldig 'where'-spørring, som skal feile
+# umiddelbart og ikke sløse tid på gjentatte forsøk).
+_session = requests.Session()
+_retry = Retry(total=3, connect=3, backoff_factor=1.5, status_forcelist=[500, 502, 503, 504])
+_session.mount("https://", HTTPAdapter(max_retries=_retry))
 
 
 class AhrefsError(RuntimeError):
@@ -28,7 +39,7 @@ def _get(settings: Settings, path: str, params: dict) -> dict:
         "Authorization": f"Bearer {settings.ahrefs_api_key}",
         "Accept": "application/json",
     }
-    resp = requests.get(f"{BASE_URL}/{path}", headers=headers, params=params, timeout=60)
+    resp = _session.get(f"{BASE_URL}/{path}", headers=headers, params=params, timeout=60)
     if resp.status_code >= 400:
         raise AhrefsError(f"{path} -> {resp.status_code}: {resp.text[:500]}")
     return resp.json()

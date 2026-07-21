@@ -37,6 +37,7 @@ def build_dashboard_payload(
         "geo": analysis.get("geo", {}),
         "tiltak": analysis.get("tiltak", []),
         "anbefaling": analysis.get("anbefaling", []),
+        "innholdsforslag": analysis.get("innholdsforslag", []),
         "organisk_fotavtrykk": analysis.get("organisk_fotavtrykk", {}),
         "datamangler": analysis.get("datamangler", []),
         "position_trend": position_trend,
@@ -66,6 +67,7 @@ def build_sheet_payload(dashboard_payload: dict) -> dict:
         "ai_overview_count": len(geo.get("ai_overview_sokeord", [])),
         "ai_overview_sokeord": geo.get("ai_overview_sokeord", [])[:30],
         "anbefaling": dashboard_payload.get("anbefaling", []),
+        "innholdsforslag": dashboard_payload.get("innholdsforslag", []),
         "organisk_fotavtrykk_total": dashboard_payload.get("organisk_fotavtrykk", {}).get("total_sokeord"),
         "organisk_fotavtrykk_cluster": dashboard_payload.get("organisk_fotavtrykk", {}).get("cluster_summary", []),
         "claude_mentions": sum(1 for r in claude_rows if r.get("krogsveen_mentioned")),
@@ -249,6 +251,12 @@ _TEMPLATE = r"""<!doctype html>
     <ul id="anbefaling-list" style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px;"></ul>
   </div>
 
+  <div class="card" id="innholdsforslag-card" style="display:none">
+    <h2>Innholdsforslag</h2>
+    <div class="card-sub">Basert på søkeord Krogsveen rangerer på, men ikke sporer ennå — fyldigere konkurrent-baserte forslag skrives til Drive-dokumentet to ganger i måneden</div>
+    <ul id="innholdsforslag-list" style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px;"></ul>
+  </div>
+
   <div class="two-col">
     <div class="card">
       <h2>Snittposisjon over tid</h2>
@@ -361,6 +369,18 @@ _TEMPLATE = r"""<!doctype html>
       var li = document.createElement("li");
       li.textContent = point;
       anbefalingList.appendChild(li);
+    });
+  }
+
+  // ---- Innholdsforslag ----
+  var innholdsforslag = data.innholdsforslag || [];
+  if (innholdsforslag.length) {
+    document.getElementById("innholdsforslag-card").style.display = "";
+    var innholdsforslagList = document.getElementById("innholdsforslag-list");
+    innholdsforslag.forEach(function (point) {
+      var li = document.createElement("li");
+      li.textContent = point;
+      innholdsforslagList.appendChild(li);
     });
   }
 

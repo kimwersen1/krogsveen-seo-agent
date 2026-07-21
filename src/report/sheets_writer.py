@@ -170,6 +170,12 @@ def update_dashboard_sheet(settings: Settings, payload: dict) -> str:
         for point in anbefaling:
             rows.append([point, "", ""])
 
+    innholdsforslag = payload.get("innholdsforslag", [])
+    if innholdsforslag:
+        rows += [["", "", ""], ["Innholdsforslag", "", ""]]
+        for point in innholdsforslag:
+            rows.append([point, "", ""])
+
     ai_overview_rows = payload.get("ai_overview_sokeord", [])
     rows += [["", "", ""], ["Søkeord med AI Overview i SERP", "Cluster", ""]]
     if not ai_overview_rows:
