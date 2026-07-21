@@ -13,7 +13,7 @@ from src.analysis import diffs as diff_analysis
 from src.analysis import geo as geo_analysis
 from src.analysis import tiltak as tiltak_analysis
 from src.analysis.keyword_gap import find_untracked_ranking_keywords
-from src.collectors import ahrefs, chatgpt_geo, claude_geo, gsc, storage
+from src.collectors import ahrefs, chatgpt_geo, claude_geo, gsc, gsc_oauth, storage
 from src.report.content_suggestions import parse_bullets, suggest_content
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
@@ -140,14 +140,31 @@ def run_pipeline(
             }
         )
 
-    gsc_query_rows = gsc.import_gsc_export(gsc_query_export, "query") if gsc_query_export else []
-    gsc_page_rows = gsc.import_gsc_export(gsc_page_export, "page") if gsc_page_export else []
-    gsc_by_keyword = _gsc_by_keyword_from_export(gsc_query_rows)
-    if not gsc_query_export:
+    if settings.gsc_oauth_configured:
+        # Direkte tilgang via brukerens egen Google-konto — se src/collectors/gsc_oauth.py
+        # for hvorfor dette virker uten admin-tilgang. Samme etterslep-justerte sluttdato
+        # som Ahrefs-hentingen over, siden Google-siden av GSC har lignende forsinkelse.
+        try:
+            gsc_query_rows = gsc_oauth.get_query_performance(
+                settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
+            )
+            gsc_page_rows = gsc_oauth.get_page_performance(
+                settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
+            )
+        except HttpError as e:
+            logger.warning("GSC OAuth-henting feilet denne uken: %s", e)
+            data_gaps.append(f"GSC OAuth-henting feilet denne uken ({e}) — klikk/CTR per søkeord mangler.")
+            gsc_query_rows, gsc_page_rows = [], []
+    elif gsc_query_export or gsc_page_export:
+        gsc_query_rows = gsc.import_gsc_export(gsc_query_export, "query") if gsc_query_export else []
+        gsc_page_rows = gsc.import_gsc_export(gsc_page_export, "page") if gsc_page_export else []
+    else:
+        gsc_query_rows, gsc_page_rows = [], []
         data_gaps.append(
-            "Ingen GSC-eksport oppgitt — klikk/CTR per søkeord mangler (kun posisjonsavvik fanges opp denne uken). "
-            "Se scripts/run_weekly.py --gsc-query-export."
+            "Ingen GSC-tilgang konfigurert — klikk/CTR per søkeord mangler (kun posisjonsavvik fanges opp denne uken). "
+            "Se scripts/gsc_auth_setup.py (automatisk, anbefalt) eller scripts/run_weekly.py --gsc-query-export (manuelt)."
         )
+    gsc_by_keyword = _gsc_by_keyword_from_export(gsc_query_rows)
 
     conn = storage.get_connection()
     storage.save_rank_tracker_rows(conn, week_start_label, "desktop", rank_desktop)

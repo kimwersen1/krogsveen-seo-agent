@@ -39,6 +39,10 @@ class Settings:
     anthropic_model: str
     openai_api_key: str
     openai_model: str
+    google_oauth_client_id: str
+    google_oauth_client_secret: str
+    google_oauth_refresh_token: str
+    google_search_console_property: str
     clusters: dict = field(default_factory=dict)
     config: dict = field(default_factory=dict)
     tiltak: list = field(default_factory=list)
@@ -59,6 +63,10 @@ class Settings:
     def klikk_terskel_pct(self) -> float:
         return self.config.get("varsel_terskler", {}).get("klikk_endring_pct", 20)
 
+    @property
+    def gsc_oauth_configured(self) -> bool:
+        return bool(self.google_oauth_client_id and self.google_oauth_client_secret and self.google_oauth_refresh_token)
+
 
 def load_settings() -> Settings:
     return Settings(
@@ -75,6 +83,14 @@ def load_settings() -> Settings:
         # stille over seg selv hvis denne mangler, i motsetning til Anthropic-nøkkelen.
         openai_api_key=os.environ.get("OPENAI_API_KEY", "").strip(),
         openai_model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+        # Valgfritt — direkte GSC-tilgang via brukerens egen Google-konto (OAuth), i
+        # stedet for manuell CSV-eksport. Se scripts/gsc_auth_setup.py for engangsoppsett.
+        # Alle tre må være satt sammen for at src/collectors/gsc_oauth.py skal brukes —
+        # pipeline.py faller tilbake til manuell CSV-import hvis noen mangler.
+        google_oauth_client_id=os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "").strip(),
+        google_oauth_client_secret=os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "").strip(),
+        google_oauth_refresh_token=os.environ.get("GOOGLE_OAUTH_REFRESH_TOKEN", "").strip(),
+        google_search_console_property=os.environ.get("GOOGLE_SEARCH_CONSOLE_PROPERTY", "sc-domain:krogsveen.no"),
         clusters=_load_json("clusters.json"),
         config=_load_json("config.json"),
         tiltak=_load_json("tiltak.json"),
