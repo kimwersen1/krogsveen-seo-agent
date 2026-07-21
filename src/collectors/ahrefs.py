@@ -8,6 +8,8 @@ import json
 import logging
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from src.settings import Settings
 
@@ -17,6 +19,15 @@ BASE_URL = "https://api.ahrefs.com/v3"
 
 RANK_TRACKER_SELECT = "keyword,position,position_prev,volume,url,serp_features"
 BRAND_RADAR_DATA_SOURCES = "chatgpt,gemini,perplexity,google_ai_overviews,google_ai_mode"
+
+# I motsetning til Anthropic/OpenAI-klientene (max_retries=5) hadde disse rå requests-
+# kallene ingen retry-logikk — en ren nettverksblunk (ConnectionResetError) veltet hele
+# ukeskjøringen i praksis (20.07.2026). Retry på tilkoblingsfeil og forbigående 5xx,
+# IKKE på 4xx (de er reelle API-feil, f.eks. ugyldig 'where'-spørring, som skal feile
+# umiddelbart og ikke sløse tid på gjentatte forsøk).
+_session = requests.Session()
+_retry = Retry(total=3, connect=3, backoff_factor=1.5, status_forcelist=[500, 502, 503, 504])
+_session.mount("https://", HTTPAdapter(max_retries=_retry))
 
 
 class AhrefsError(RuntimeError):
@@ -28,7 +39,7 @@ def _get(settings: Settings, path: str, params: dict) -> dict:
         "Authorization": f"Bearer {settings.ahrefs_api_key}",
         "Accept": "application/json",
     }
-    resp = requests.get(f"{BASE_URL}/{path}", headers=headers, params=params, timeout=60)
+    resp = _session.get(f"{BASE_URL}/{path}", headers=headers, params=params, timeout=60)
     if resp.status_code >= 400:
         raise AhrefsError(f"{path} -> {resp.status_code}: {resp.text[:500]}")
     return resp.json()
@@ -318,3 +329,46 @@ def get_organic_keywords_for_list(
     }
     data = _get(settings, "site-explorer/organic-keywords", params)
     return data.get("keywords", [])
+
+
+def get_organic_keywords_paginated(
+    settings: Settings,
+    target: str,
+    date: str,
+    country: str = "no",
+    position_max: int = 50,
+    max_rows: int = 1500,
+    per_position_limit: int = 100,
+) -> list[dict]:
+    """Som get_organic_keywords, men henter forbi den samme 100-rader-capen som
+    rank-tracker/overview har (se der for detaljer om begrensningen). Alltid
+    with_metrics=False — billig (~2 enheter/rad), brukt til bredde-kartlegging (hele det
+    organiske fotavtrykket, ikke kun de 338 manuelt sporede Rank Tracker-ordene).
+
+    Spør én eksakt posisjon om gangen (where best_position eq N, N = 1..position_max) i
+    stedet for keyset-paginering med et voksende 'neq'-tie-break-sett — sistnevnte fikk
+    Ahrefs API til å svare 500 internal server error i praksis (20.07.2026), fordi
+    Krogsveen har hundrevis av adressespesifikke long-tail-søkeord som alle rangerer
+    posisjon 1 (egne annonse-/prisstatistikksider), og where-klausulen ble for kompleks.
+    Cappet på per_position_limit rader PER posisjon — ikke garantert uttømmende for
+    svært tiede posisjoner, men gir et representativt bredde-bilde uten å krasje.
+    """
+    all_rows: list[dict] = []
+    for pos in range(1, position_max + 1):
+        if len(all_rows) >= max_rows:
+            break
+        params = {
+            "select": "keyword,best_position,best_position_url",
+            "target": target,
+            "mode": "subdomains",
+            "country": country,
+            "date": date,
+            "where": json.dumps({"field": "best_position", "is": ["eq", pos]}),
+            "limit": per_position_limit,
+            "output": "json",
+        }
+        data = _get(settings, "site-explorer/organic-keywords", params)
+        all_rows.extend(data.get("keywords", []))
+
+    logger.info("organic-keywords (%s, paginert per posisjon): %d rader", target, len(all_rows))
+    return all_rows[:max_rows]

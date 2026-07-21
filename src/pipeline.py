@@ -12,10 +12,12 @@ from src.analysis import clusters as cluster_analysis
 from src.analysis import diffs as diff_analysis
 from src.analysis import geo as geo_analysis
 from src.analysis import tiltak as tiltak_analysis
-from src.collectors import ahrefs, chatgpt_geo, claude_geo, gsc, storage
+from src.analysis.keyword_gap import find_untracked_ranking_keywords
+from src.collectors import ahrefs, chatgpt_geo, claude_geo, gsc, gsc_oauth, storage
+from src.report.content_suggestions import parse_bullets, suggest_content
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
-from src.report.generate import generate_report
+from src.report.generate import extract_recommendations, generate_report
 from src.report.sheets_writer import DashboardSheetNotFound, update_dashboard_sheet
 from src.settings import Settings, load_settings
 
@@ -85,6 +87,7 @@ def run_pipeline(
 
     domain_rating, site_metrics, brand_mentions, brand_sov, cited_pages = None, None, [], [], []
     competitor_benchmark: list[dict] = []
+    footprint_rows: list[dict] = []
     if not over_budget:
         domain_rating = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat())
         site_metrics = ahrefs.get_site_metrics(settings, windows["ahrefs_date"].isoformat())
@@ -104,6 +107,10 @@ def run_pipeline(
                     "org_traffic": comp_metrics.get("org_traffic"),
                 }
             )
+
+        # Bredere søkeordsdekning enn de 338 manuelt sporede Rank Tracker-ordene — billig
+        # (with_metrics=False, ~2 enheter/rad) bredde-kartlegging, se ahrefs.py for detaljer.
+        footprint_rows = ahrefs.get_organic_keywords_paginated(settings, "krogsveen.no", windows["ahrefs_date"].isoformat())
 
     # GSC-data hos Ahrefs kan ha noen dagers etterslep fra Google — spør om et vindu
     # som slutter noen dager tilbake i tid i stedet for i går, og degrader til en
@@ -133,14 +140,31 @@ def run_pipeline(
             }
         )
 
-    gsc_query_rows = gsc.import_gsc_export(gsc_query_export, "query") if gsc_query_export else []
-    gsc_page_rows = gsc.import_gsc_export(gsc_page_export, "page") if gsc_page_export else []
-    gsc_by_keyword = _gsc_by_keyword_from_export(gsc_query_rows)
-    if not gsc_query_export:
+    if settings.gsc_oauth_configured:
+        # Direkte tilgang via brukerens egen Google-konto — se src/collectors/gsc_oauth.py
+        # for hvorfor dette virker uten admin-tilgang. Samme etterslep-justerte sluttdato
+        # som Ahrefs-hentingen over, siden Google-siden av GSC har lignende forsinkelse.
+        try:
+            gsc_query_rows = gsc_oauth.get_query_performance(
+                settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
+            )
+            gsc_page_rows = gsc_oauth.get_page_performance(
+                settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
+            )
+        except HttpError as e:
+            logger.warning("GSC OAuth-henting feilet denne uken: %s", e)
+            data_gaps.append(f"GSC OAuth-henting feilet denne uken ({e}) — klikk/CTR per søkeord mangler.")
+            gsc_query_rows, gsc_page_rows = [], []
+    elif gsc_query_export or gsc_page_export:
+        gsc_query_rows = gsc.import_gsc_export(gsc_query_export, "query") if gsc_query_export else []
+        gsc_page_rows = gsc.import_gsc_export(gsc_page_export, "page") if gsc_page_export else []
+    else:
+        gsc_query_rows, gsc_page_rows = [], []
         data_gaps.append(
-            "Ingen GSC-eksport oppgitt — klikk/CTR per søkeord mangler (kun posisjonsavvik fanges opp denne uken). "
-            "Se scripts/run_weekly.py --gsc-query-export."
+            "Ingen GSC-tilgang konfigurert — klikk/CTR per søkeord mangler (kun posisjonsavvik fanges opp denne uken). "
+            "Se scripts/gsc_auth_setup.py (automatisk, anbefalt) eller scripts/run_weekly.py --gsc-query-export (manuelt)."
         )
+    gsc_by_keyword = _gsc_by_keyword_from_export(gsc_query_rows)
 
     conn = storage.get_connection()
     storage.save_rank_tracker_rows(conn, week_start_label, "desktop", rank_desktop)
@@ -195,6 +219,22 @@ def run_pipeline(
     position_trend = storage.get_position_trend(conn, weeks=12)
     clicks_trend = storage.get_clicks_trend(conn, weeks=12)
 
+    tagged_footprint = cluster_analysis.tag_rows(footprint_rows, settings.clusters)
+    if tagged_footprint:
+        storage.save_organic_footprint_rows(conn, week_start_label, tagged_footprint)
+    footprint_cluster_summary = cluster_analysis.summarize_footprint_by_cluster(
+        tagged_footprint, list(settings.clusters.keys())
+    )
+    footprint_trend = storage.get_organic_footprint_trend(conn, weeks=12)
+
+    # Gratis (gjenbruker footprint-data over) ukentlig innholdsforslag i dashboard —
+    # kun untracked-siden av gap-analysen, ikke de dyrere konkurrent-sammenligningene
+    # (de kjøres i stedet to ganger i måneden via scripts/keyword_discovery.py --to-drive).
+    tracked_keywords = {r["keyword"] for r in rank_desktop if r.get("keyword")}
+    weekly_untracked = find_untracked_ranking_keywords(tagged_footprint, tracked_keywords, settings.clusters)
+    content_suggestions_markdown = suggest_content(settings, weekly_untracked, [])
+    content_suggestions = parse_bullets(content_suggestions_markdown)
+
     conn.close()
 
     analysis = {
@@ -206,6 +246,10 @@ def run_pipeline(
         "gsc_site": gsc_site_rows,
         "cluster_summaries": [vars(c) for c in cluster_summaries],
         "avvik": anomalies,
+        "organisk_fotavtrykk": {
+            "total_sokeord": len(footprint_rows),
+            "cluster_summary": footprint_cluster_summary,
+        },
         "geo": {
             "ai_overview_sokeord": ai_overview_keywords,
             "brand_radar_share_of_voice": sov_summary,
@@ -216,14 +260,18 @@ def run_pipeline(
         },
         "tiltak": tiltak_status,
         "konkurrenter": settings.competitors,
+        "innholdsforslag": content_suggestions,
         "datamangler": data_gaps,
     }
 
-    dashboard_payload = build_dashboard_payload(analysis, position_trend, clicks_trend, competitor_benchmark, today)
-    dashboard_path = render_dashboard(dashboard_payload)
-
     report_markdown = generate_report(settings, analysis)
+    analysis["anbefaling"] = extract_recommendations(report_markdown)
     title = report_title(today)
+
+    dashboard_payload = build_dashboard_payload(
+        analysis, position_trend, clicks_trend, competitor_benchmark, today, footprint_trend
+    )
+    dashboard_path = render_dashboard(dashboard_payload)
 
     result = {
         "analysis": analysis,

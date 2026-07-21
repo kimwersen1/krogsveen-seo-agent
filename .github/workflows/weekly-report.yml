@@ -33,9 +33,9 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT_B64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT_B64 }}
 
-      # NB: --gsc-query-export/--gsc-page-export er ikke satt her — CSV-en må eksporteres
-      # manuelt fra GSC UI (se scripts/run_weekly.py), så den automatiske kjøringen får kun
-      # site-wide GSC-tall (via Ahrefs), ikke klikk per søkeord/side.
+      # Klikk/CTR per søkeord/side kommer nå automatisk via GSC OAuth (GOOGLE_OAUTH_*
+      # under) hvis konfigurert — --gsc-query-export/--gsc-page-export (manuell CSV) er
+      # kun en reserveløsning og ikke satt her.
       - name: Kjør ukesrapport
         env:
           AHREFS_API_KEY: ${{ secrets.AHREFS_API_KEY }}
@@ -48,6 +48,16 @@ jobs:
           # Valgfritt — ChatGPT-selvsjekken hopper stille over seg selv uten disse.
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          # Valgfritt — direkte GSC-tilgang (se scripts/gsc_auth_setup.py). Pipeline
+          # faller tilbake til manuell CSV-import hvis disse mangler.
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+          # GOOGLE_SEARCH_CONSOLE_PROPERTY er IKKE satt her med vilje — standardverdien i
+          # settings.py (sc-domain:krogsveen.no) er riktig, og en GitHub-secret som ikke
+          # finnes ville satt env-variabelen til en tom streng (ikke "usatt"), som
+          # overstyrer Python sin default og feiler mot Search Console API (skjedde
+          # 21.07.2026: 'http://' is not a valid Search Console site URL).
         run: python scripts/run_weekly.py
 
       # data/history.db er unntatt fra .gitignore med vilje — uten dette starter hver

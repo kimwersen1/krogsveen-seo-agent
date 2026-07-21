@@ -63,6 +63,15 @@ CREATE TABLE IF NOT EXISTS geo_selfcheck_weekly (
     sentiment_begrunnelse TEXT,
     PRIMARY KEY (week_start, source, prompt)
 );
+
+CREATE TABLE IF NOT EXISTS organic_footprint_weekly (
+    week_start TEXT NOT NULL,
+    keyword TEXT NOT NULL,
+    position INTEGER,
+    url TEXT,
+    clusters TEXT,
+    PRIMARY KEY (week_start, keyword)
+);
 """
 
 
@@ -209,6 +218,43 @@ def save_geo_selfcheck_rows(conn: sqlite3.Connection, week_start: str, rows: lis
     conn.commit()
 
 
+def save_organic_footprint_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict]) -> None:
+    """rows: tagget output fra ahrefs.get_organic_keywords_paginated (keyword, best_position,
+    best_position_url, clusters)."""
+    conn.executemany(
+        """INSERT OR REPLACE INTO organic_footprint_weekly
+           (week_start, keyword, position, url, clusters)
+           VALUES (?, ?, ?, ?, ?)""",
+        [
+            (
+                week_start,
+                r.get("keyword"),
+                r.get("best_position"),
+                r.get("best_position_url"),
+                json.dumps(r.get("clusters", [])),
+            )
+            for r in rows
+        ],
+    )
+    conn.commit()
+
+
+def get_organic_footprint_trend(conn: sqlite3.Connection, weeks: int = 12) -> list[dict]:
+    """Antall søkeord og snittposisjon i det fulle organiske fotavtrykket per uke —
+    bredde-trend uavhengig av de 338 manuelt sporede Rank Tracker-ordene."""
+    cur = conn.execute(
+        """SELECT week_start, COUNT(*) as n, AVG(position) as avg_position
+           FROM organic_footprint_weekly
+           WHERE position IS NOT NULL
+           GROUP BY week_start
+           ORDER BY week_start DESC
+           LIMIT ?""",
+        (weeks,),
+    )
+    rows = [{"week_start": w, "keyword_count": n, "avg_position": round(p, 2)} for w, n, p in cur.fetchall()]
+    return list(reversed(rows))
+
+
 def get_position_trend(conn: sqlite3.Connection, weeks: int = 12) -> list[dict]:
     """Snitt-posisjon (desktop) per uke på tvers av alle sporede søkeord — for dashboard-trendgraf."""
     cur = conn.execute(
@@ -246,6 +292,7 @@ def get_history(conn: sqlite3.Connection, table: str, weeks: int = 12) -> list[d
         "brand_radar_weekly",
         "gsc_site_weekly",
         "geo_selfcheck_weekly",
+        "organic_footprint_weekly",
     }:
         raise ValueError(f"Ukjent tabell: {table}")
     cur = conn.execute(

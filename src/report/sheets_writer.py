@@ -157,6 +157,32 @@ def update_dashboard_sheet(settings: Settings, payload: dict) -> str:
     for c in payload.get("cluster_summaries", []):
         rows.append([c["name"], c["keyword_count"], round(c["avg_position_delta"], 2)])
 
+    footprint_cluster = payload.get("organisk_fotavtrykk_cluster", [])
+    if footprint_cluster:
+        total = payload.get("organisk_fotavtrykk_total")
+        rows += [["", "", ""], [f"Organisk fotavtrykk ({total} søkeord totalt, topp 50)", "Antall", "Snittposisjon"]]
+        for c in footprint_cluster:
+            rows.append([c["name"], c["keyword_count"], c.get("avg_position") if c.get("avg_position") is not None else ""])
+
+    anbefaling = payload.get("anbefaling", [])
+    if anbefaling:
+        rows += [["", "", ""], ["Anbefaling for neste uke", "", ""]]
+        for point in anbefaling:
+            rows.append([point, "", ""])
+
+    innholdsforslag = payload.get("innholdsforslag", [])
+    if innholdsforslag:
+        rows += [["", "", ""], ["Innholdsforslag", "", ""]]
+        for point in innholdsforslag:
+            rows.append([point, "", ""])
+
+    ai_overview_rows = payload.get("ai_overview_sokeord", [])
+    rows += [["", "", ""], ["Søkeord med AI Overview i SERP", "Cluster", ""]]
+    if not ai_overview_rows:
+        rows.append(["Ingen søkeord med AI Overview denne uken", "", ""])
+    for r in ai_overview_rows:
+        rows.append([r.get("keyword", ""), ", ".join(r.get("clusters", [])), ""])
+
     rows += [["", "", ""], ["GEO-prompt (Claude)", "Nevnt?", "Sentiment"]]
     for r in payload.get("claude_selvsjekk", []):
         sentiment = r.get("sentiment") or ""

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Søkeordsoppdagelse utenfor de 338 sporede ordene i Rank Tracker.
 
-To ting sjekkes:
+Tre ting sjekkes:
   1. Søkeord Krogsveen allerede rangerer på, men ikke sporer (bør legges til Rank Tracker).
   2. Søkeord konkurrenter rangerer godt på som Krogsveen ikke har synlighet på (innholdshull).
+  3. Ved --to-drive: Claude foreslår konkrete artikkel-/sideideer basert på 1+2
+     (src/report/content_suggestions.py) — ikke kjørt ved konsoll-only-kjøring, siden det
+     koster en ekstra Anthropic-samtale uten at noen leser resultatet.
 
 KOSTNAD: en full kjøring med alle 8 konkurrenter fra config.json (standard) bruker typisk
 12 000–16 000 Ahrefs-enheter (se subscription-info før/etter i output) — fortsatt under
@@ -32,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.analysis.keyword_gap import find_competitor_gap_keywords, find_untracked_ranking_keywords  # noqa: E402
 from src.collectors import ahrefs  # noqa: E402
+from src.report.content_suggestions import suggest_content  # noqa: E402
 from src.report.drive_writer import prepend_report_section  # noqa: E402
 from src.settings import load_settings  # noqa: E402
 
@@ -100,7 +104,7 @@ def format_console(result: dict) -> None:
         )
 
 
-def format_markdown(result: dict) -> str:
+def format_markdown(result: dict, content_suggestions: str | None = None) -> str:
     lines = [
         "## Søkeord Krogsveen allerede rangerer på, men ikke sporer",
         "Kandidater for å legges til manuelt i Ahrefs Rank Tracker "
@@ -128,6 +132,10 @@ def format_markdown(result: dict) -> str:
             f"- **{row['keyword']}** (vol {row.get('volume')}, {row['_competitor']} pos {row.get('best_position')}, "
             f"Krogsveen: {row['krogsveen_position'] or 'ingen rangering'}) — {clusters_label}"
         )
+
+    if content_suggestions:
+        lines += ["", "## Forslag til nye artikler/publiseringer", content_suggestions]
+
     return "\n".join(lines)
 
 
@@ -155,8 +163,10 @@ def main() -> None:
     print(f"\nEnheter brukt i denne kjøringen: ~{used_after - used_before}")
 
     if args.to_drive:
+        print("\nBer Claude om forslag til nye artikler/publiseringer basert på gap-listen...")
+        content_suggestions = suggest_content(settings, result["untracked"], result["gaps"])
         title = f"Søkeordsoppdagelse – {date.today().strftime('%B %Y')}"
-        url = prepend_report_section(settings, title, format_markdown(result))
+        url = prepend_report_section(settings, title, format_markdown(result, content_suggestions))
         print(f"\nSkrevet til Drive-dokument: {url}")
 
 

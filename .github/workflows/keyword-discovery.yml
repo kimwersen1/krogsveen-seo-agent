@@ -1,13 +1,14 @@
-name: Månedlig søkeordsoppdagelse
+name: Bi-ukentlig søkeordsoppdagelse og innholdsforslag
 
-# Kun manuell trigger (workflow_dispatch) inntil brukeren har bekreftet cron-tidspunkt
-# og sjekket kostnaden (typisk 3 000-6 000 Ahrefs-enheter per kjøring) er ok på løpende
-# basis. Aktiver cron ved å fjerne kommentaren under når det er avklart — foreslått
-# tidspunkt: kl. 06:00 UTC første dag i hver måned.
+# To ganger i måneden (1. og 15., 06:00 UTC) — cron har ingen "hver 14. dag"-primitiv,
+# så dette er den vanlige tilnærmingen til bi-ukentlig kadence. Skriver funn + Claude-
+# genererte artikkelforslag til det løpende Drive-dokumentet (--to-drive). Kostnad:
+# typisk 12 000-16 000 Ahrefs-enheter per kjøring (alle 8 konkurrenter) — under 35 %
+# av månedlig kvote selv med to kjøringer/måned.
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: "0 6 1 * *"
+  schedule:
+    - cron: "0 6 1,15 * *"
 
 jobs:
   keyword-discovery:
