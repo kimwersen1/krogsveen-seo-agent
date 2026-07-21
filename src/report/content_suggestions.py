@@ -15,19 +15,47 @@ import anthropic
 
 from src.settings import Settings
 
-# Basert på faktisk gjennomgang av krogsveen.no (21.07.2026) — se to reelle, men ulike
-# mønstre på sitet i dag: magasinartikler (narrativ prosa, ekte navngitte
-# meglere/kontorsjefer sitert med tittel, "vi/du"-tone, ingen eksplisitt spørsmål-
-# struktur) vs. transaksjonssider som /e-takst (sterk "Hva er X? / Hvor lenge er X
-# gyldig?"-struktur, punktlister, klar prising — mye mer GEO/AI Overview-vennlig fordi
-# LLM-er og Googles AI-sammendrag lettere trekker ut rene spørsmål-svar-par).
-TONE_OF_VOICE = """Krogsveens tone: varm, rådgivende, "vi/du" — snakker til leseren som et
-menneske med en reell beslutning foran seg, ikke som et salgsobjekt. Selger ikke Krogsveen
-direkte i brødteksten (ingen "bestill hos oss nå"-CTA-er midt i teksten) — tillit bygges
-gjennom konkrete, ærlige råd, ofte med et sitat fra en navngitt megler eller kontorsjef med
-tittel og kontor (f.eks. "Therese Thon Andreassen, daglig leder i Krogsveen Tønsberg").
+# Grunnet i to kilder (21.07.2026):
+# 1. Faktisk gjennomgang av krogsveen.no — to reelle, men ulike mønstre på sitet i dag:
+#    magasinartikler (narrativ prosa, ekte navngitte meglere/kontorsjefer sitert med
+#    tittel, "vi/du"-tone, ingen eksplisitt spørsmål-struktur) vs. transaksjonssider som
+#    /e-takst (sterk "Hva er X? / Hvor lenge er X gyldig?"-struktur, punktlister, klar
+#    prising — mye mer GEO/AI Overview-vennlig fordi LLM-er og Googles AI-sammendrag
+#    lettere trekker ut rene spørsmål-svar-par).
+# 2. Krogsveens offisielle kommunikasjonsstrategi (PDF delt av bruker, "Ring 2"/2025) —
+#    formål, verdier og en eksplisitt "vi er / vi er ikke"-tonematrise. Denne dekker ikke
+#    alt (ingen målgruppe-/persona-seksjon, ingen eksplisitte skriveregler for
+#    nettinnhold) — brukes i kombinasjon med observasjonene fra sitet, ikke i stedet for.
+TONE_OF_VOICE = """Formål: "Vi skaper trygghet og gir retning til verdifulle livsvalg."
+Løfte: "Vi tilfører verdier – i alle betydninger av ordet" — en dobbel bunn av økonomi
+(markedsverdi) og følelser (trygghet, historie, livsvalg, relasjoner). Kjerneordet er
+"verdi", og den offisielle meldingsformelen er "Verdien av [noe]" (samme mønster som
+forsidens tittel "Verdien av en god megler") — bruk denne formelen i titler der det
+passer naturlig, ikke tvunget inn overalt.
+
+Fire verdier: Trygg, Ambisiøs, Dedikert, Lagspiller.
+
+Tone-of-voice-matrise (offisiell, "vi er / vi er ikke") — bruk denne som en sjekkliste,
+ikke bare et vibe-notat:
+- Solide, MEN IKKE trauste
+- Rå (dvs. ærlige/direkte), MEN IKKE kyniske
+- Empatiske, MEN IKKE veike
+- Kompetente, MEN IKKE rigide
+- Effektive, MEN TAR IKKE snarveier
+- Selvsikre, MEN IKKE arrogante
+
+Offisiell prinsipp for budskap: "Budskapene må være enkle, men også pedagogiske — de må
+gi mening i korte og begrensede formater." Dette støtter direkte GEO-målet: korte,
+selvstendige, siterbare avsnitt fungerer både for lesere og for LLM-er som trekker ut
+enkeltsetninger.
+
+Konkret i praksis (fra selve nettsiden): snakker til leseren som et menneske med en reell
+beslutning foran seg, ikke som et salgsobjekt. Selger ikke Krogsveen direkte i
+brødteksten (ingen "bestill hos oss nå"-CTA-er midt i teksten) — tillit bygges gjennom
+konkrete, ærlige råd, ofte med et sitat fra en navngitt megler eller kontorsjef med tittel
+og kontor (f.eks. "Therese Thon Andreassen, daglig leder i Krogsveen Tønsberg").
 Overskrifter er innsikt, ikke etiketter ("Lokalkunnskap gir et bedre utgangspunkt", ikke
-"Om lokalkunnskap"). Avslutter gjerne med en kort tillits-appellerende oppsummering.
+"Om lokalkunnskap").
 
 Strukturell svakhet å rette opp i nye forslag: dagens magasinartikler er ren narrativ
 prosa uten eksplisitte spørsmål-overskrifter, mens sider som /e-takst allerede viser at
@@ -42,8 +70,7 @@ meglerkonkurrenter (hjemla.no, DNB Eiendom, Eiendomsmegler1, osv.) i et forslag,
 konkurrent-gap-dataen under viser hvilket firma som rangerer på et ord. Bruk gap-dataen
 kun til å identifisere SELVE SØKEORDET/BEHOVET som mangler dekning, ikke til å foreslå
 sammenligningsinnhold ("Krogsveen vs [konkurrent]" e.l.). Skryt ikke av størrelse eller
-overdriv — behold den nøkterne, faktabaserte tonen selv i forslag rettet mot
-konkurransetunge søkeord."""
+overdriv — dette matcher "selvsikre, men ikke arrogante" fra tonematrisen over."""
 
 SYSTEM_PROMPT = f"""Du er en SEO/GEO-innholdsstrateg for krogsveen.no, en norsk eiendomsmegler.
 Du får en liste søkeord Krogsveen enten rangerer på uten å spore det i Rank Tracker, eller
