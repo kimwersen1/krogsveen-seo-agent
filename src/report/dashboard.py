@@ -32,12 +32,13 @@ def build_dashboard_payload(
         "domain_rating": analysis.get("domain_rating"),
         "site_metrics": analysis.get("site_metrics"),
         "gsc_site": analysis.get("gsc_site", []),
+        "gsc_kilde": analysis.get("gsc_kilde", "ingen"),
         "cluster_summaries": analysis.get("cluster_summaries", []),
         "avvik": analysis.get("avvik", [])[:15],
         "geo": analysis.get("geo", {}),
         "tiltak": analysis.get("tiltak", []),
         "anbefaling": analysis.get("anbefaling", []),
-        "innholdsforslag": analysis.get("innholdsforslag", []),
+        "innholdsforslag_dokument": analysis.get("innholdsforslag_dokument"),
         "organisk_fotavtrykk": analysis.get("organisk_fotavtrykk", {}),
         "datamangler": analysis.get("datamangler", []),
         "position_trend": position_trend,
@@ -67,7 +68,7 @@ def build_sheet_payload(dashboard_payload: dict) -> dict:
         "ai_overview_count": len(geo.get("ai_overview_sokeord", [])),
         "ai_overview_sokeord": geo.get("ai_overview_sokeord", [])[:30],
         "anbefaling": dashboard_payload.get("anbefaling", []),
-        "innholdsforslag": dashboard_payload.get("innholdsforslag", []),
+        "innholdsforslag_dokument": dashboard_payload.get("innholdsforslag_dokument"),
         "organisk_fotavtrykk_total": dashboard_payload.get("organisk_fotavtrykk", {}).get("total_sokeord"),
         "organisk_fotavtrykk_cluster": dashboard_payload.get("organisk_fotavtrykk", {}).get("cluster_summary", []),
         "claude_mentions": sum(1 for r in claude_rows if r.get("krogsveen_mentioned")),
@@ -185,7 +186,7 @@ _TEMPLATE = r"""<!doctype html>
   td { font-variant-numeric: tabular-nums; }
   tr.self td { background: var(--accent-soft); font-weight: 600; }
   .table-scroll { overflow-x: auto; }
-  .cluster-row { display: grid; grid-template-columns: 100px 1fr 60px 50px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .cluster-row { display: grid; grid-template-columns: 100px 1fr 60px 150px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
   .cluster-row:last-child { border-bottom: none; }
   .cluster-name { font-weight: 600; }
   .cluster-track { height: 7px; border-radius: 4px; background: var(--bg-surface-2); overflow: hidden; display: flex; }
@@ -253,8 +254,9 @@ _TEMPLATE = r"""<!doctype html>
 
   <div class="card" id="innholdsforslag-card" style="display:none">
     <h2>Innholdsforslag</h2>
-    <div class="card-sub">Basert på søkeord Krogsveen rangerer på, men ikke sporer ennå — fyldigere konkurrent-baserte forslag skrives til Drive-dokumentet to ganger i måneden</div>
-    <ul id="innholdsforslag-list" style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px;"></ul>
+    <div class="card-sub">2-3 grundige forslag (SEO + GEO), oppdatert to ganger i måneden med søkeordsgap mot konkurrenter</div>
+    <a id="innholdsforslag-link" href="#" target="_blank" rel="noopener" style="font-size:13.5px; font-weight: 600; color: var(--accent);"></a>
+    <div id="innholdsforslag-updated" style="font-size:12px; color: var(--ink-muted); margin-top: 4px;"></div>
   </div>
 
   <div class="two-col">
@@ -291,7 +293,7 @@ _TEMPLATE = r"""<!doctype html>
   <div class="two-col">
     <div class="card">
       <h2>GEO / AI-synlighet</h2>
-      <div class="card-sub">Claude-selvsjekk (ekte) vs. Brand Radar (venter på oppsett)</div>
+      <div class="card-sub">Claude + ChatGPT-selvsjekk (ekte) vs. Brand Radar (venter på oppsett)</div>
       <div id="geo-panel"></div>
     </div>
     <div class="card">
@@ -332,12 +334,21 @@ _TEMPLATE = r"""<!doctype html>
     chipRow.appendChild(span);
   }
   addChip("Ahrefs Rank Tracker", true);
-  addChip("GSC (via Ahrefs)", true);
+  var gscLabels = {
+    oauth: ["GSC (direkte, OAuth)", true],
+    csv: ["GSC (manuell CSV)", true],
+    ingen: ["GSC (ikke konfigurert)", false]
+  };
+  var gscChip = gscLabels[data.gsc_kilde] || gscLabels.ingen;
+  addChip(gscChip[0], gscChip[1]);
   var brandRadarOk = data.geo.brand_radar_omtaler && Object.keys(data.geo.brand_radar_omtaler).some(function(k) {
     return data.geo.brand_radar_omtaler[k].total > 0;
   });
   addChip("Brand Radar", brandRadarOk);
   addChip("Claude-selvsjekk", true);
+  if ((data.geo.chatgpt_selvsjekk || []).length) {
+    addChip("ChatGPT-selvsjekk", true);
+  }
 
   // ---- Stat tiles ----
   var statGrid = document.getElementById("stat-grid");
@@ -372,16 +383,14 @@ _TEMPLATE = r"""<!doctype html>
     });
   }
 
-  // ---- Innholdsforslag ----
-  var innholdsforslag = data.innholdsforslag || [];
-  if (innholdsforslag.length) {
+  // ---- Innholdsforslag (lenke til eget dokument, ikke inline punktliste) ----
+  var briefsDoc = data.innholdsforslag_dokument;
+  if (briefsDoc && briefsDoc.url) {
     document.getElementById("innholdsforslag-card").style.display = "";
-    var innholdsforslagList = document.getElementById("innholdsforslag-list");
-    innholdsforslag.forEach(function (point) {
-      var li = document.createElement("li");
-      li.textContent = point;
-      innholdsforslagList.appendChild(li);
-    });
+    var link = document.getElementById("innholdsforslag-link");
+    link.href = briefsDoc.url;
+    link.textContent = "Åpne innholdsforslag (" + (briefsDoc.antall_forslag || "?") + " forslag) →";
+    document.getElementById("innholdsforslag-updated").textContent = "Sist oppdatert " + briefsDoc.updated_at;
   }
 
   // ---- AI Overview-søkeord ----
@@ -458,13 +467,19 @@ _TEMPLATE = r"""<!doctype html>
   // ---- Cluster rows ----
   var clusterWrap = document.getElementById("cluster-rows");
   var totalTracked = (data.cluster_summaries || []).reduce(function (s, c) { return s + c.keyword_count; }, 0);
-  document.getElementById("cluster-sub").textContent = "Desktop, uke-mot-uke — " + totalTracked + " sporede søkeord på tvers av clustre";
+  document.getElementById("cluster-sub").textContent =
+    "Desktop, uke-mot-uke — " + totalTracked + " sporede søkeord på tvers av clustre. " +
+    "Snittendring i posisjonsplasser (grønn = bedre plassering i søkeresultatet, rød = dårligere).";
   (data.cluster_summaries || []).forEach(function (c) {
     var total = c.improved + c.declined + c.unchanged || 1;
     var row = document.createElement("div");
     row.className = "cluster-row";
     var deltaClass = c.avg_position_delta > 0 ? "up" : c.avg_position_delta < 0 ? "down" : "flat";
-    var sign = c.avg_position_delta > 0 ? "+" : "";
+    var deltaLabel = c.avg_position_delta > 0
+      ? Math.abs(c.avg_position_delta).toFixed(1) + " plasser bedre"
+      : c.avg_position_delta < 0
+        ? Math.abs(c.avg_position_delta).toFixed(1) + " plasser dårligere"
+        : "uendret";
     row.innerHTML =
       '<span class="cluster-name">' + c.name + '</span>' +
       '<span class="cluster-track">' +
@@ -473,7 +488,7 @@ _TEMPLATE = r"""<!doctype html>
         '<span class="seg-flat" style="flex:' + c.unchanged + '"></span>' +
       '</span>' +
       '<span class="cluster-count">' + c.keyword_count + '</span>' +
-      '<span class="cluster-delta ' + deltaClass + '">' + sign + c.avg_position_delta.toFixed(1) + '</span>';
+      '<span class="cluster-delta ' + deltaClass + '">' + deltaLabel + '</span>';
     clusterWrap.appendChild(row);
   });
 

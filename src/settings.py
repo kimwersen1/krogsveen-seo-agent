@@ -44,6 +44,7 @@ class Settings:
     google_drive_folder_id: str
     google_report_doc_name: str
     google_dashboard_sheet_name: str
+    google_content_briefs_doc_name: str
     anthropic_api_key: str
     anthropic_model: str
     openai_api_key: str
@@ -86,6 +87,7 @@ def load_settings() -> Settings:
         google_drive_folder_id=_require("GOOGLE_DRIVE_FOLDER_ID"),
         google_report_doc_name=_optional("GOOGLE_REPORT_DOC_NAME", "SEO-ukentlig rapport Krogsveen"),
         google_dashboard_sheet_name=_optional("GOOGLE_DASHBOARD_SHEET_NAME", "SEO-dashboard Krogsveen"),
+        google_content_briefs_doc_name=_optional("GOOGLE_CONTENT_BRIEFS_DOC_NAME", "Krogsveen SEO – Innholdsforslag"),
         anthropic_api_key=_require("ANTHROPIC_API_KEY"),
         anthropic_model=_optional("ANTHROPIC_MODEL", "claude-sonnet-5"),
         # Valgfritt — ChatGPT-selvsjekken (src/collectors/chatgpt_geo.py) hopper

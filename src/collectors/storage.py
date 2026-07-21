@@ -72,6 +72,13 @@ CREATE TABLE IF NOT EXISTS organic_footprint_weekly (
     clusters TEXT,
     PRIMARY KEY (week_start, keyword)
 );
+
+CREATE TABLE IF NOT EXISTS content_briefs_meta (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    url TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    antall_forslag INTEGER
+);
 """
 
 
@@ -253,6 +260,26 @@ def get_organic_footprint_trend(conn: sqlite3.Connection, weeks: int = 12) -> li
     )
     rows = [{"week_start": w, "keyword_count": n, "avg_position": round(p, 2)} for w, n, p in cur.fetchall()]
     return list(reversed(rows))
+
+
+def save_content_briefs_meta(conn: sqlite3.Connection, url: str, updated_at: str, antall_forslag: int) -> None:
+    """Lagrer kun siste kjente lenke til innholdsforslag-dokumentet (singleton-rad, id=1)
+    — dashboardet trenger bare å vite hvor det ligger og når det sist ble oppdatert, ikke
+    en historikk. Skrives av scripts/keyword_discovery.py --to-drive, leses av
+    src/pipeline.py (ukentlig) slik at dashboardet viser lenken selv de ukene den
+    dyrere bi-ukentlige jobben ikke kjører."""
+    conn.execute(
+        "INSERT OR REPLACE INTO content_briefs_meta (id, url, updated_at, antall_forslag) VALUES (1, ?, ?, ?)",
+        (url, updated_at, antall_forslag),
+    )
+    conn.commit()
+
+
+def get_content_briefs_meta(conn: sqlite3.Connection) -> dict | None:
+    row = conn.execute("SELECT url, updated_at, antall_forslag FROM content_briefs_meta WHERE id = 1").fetchone()
+    if not row:
+        return None
+    return {"url": row[0], "updated_at": row[1], "antall_forslag": row[2]}
 
 
 def get_position_trend(conn: sqlite3.Connection, weeks: int = 12) -> list[dict]:

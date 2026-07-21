@@ -140,6 +140,62 @@ def find_report_doc(settings: Settings) -> str | None:
     return files[0]["id"] if files else None
 
 
+class ContentBriefsDocNotFound(RuntimeError):
+    pass
+
+
+def find_content_briefs_doc(settings: Settings) -> str | None:
+    """Finner det dedikerte innholdsforslag-dokumentet ved navn. Returnerer doc-ID eller None."""
+    creds = _credentials(settings)
+    drive = build("drive", "v3", credentials=creds, cache_discovery=False)
+    safe_name = settings.google_content_briefs_doc_name.replace("'", "\\'")
+    query = (
+        f"name contains '{safe_name}' "
+        f"and '{settings.google_drive_folder_id}' in parents "
+        "and mimeType = 'application/vnd.google-apps.document' and trashed = false"
+    )
+    result = drive.files().list(q=query, fields="files(id, name)").execute()
+    files = result.get("files", [])
+    return files[0]["id"] if files else None
+
+
+def _clear_document(docs, doc_id: str) -> None:
+    doc = docs.documents().get(documentId=doc_id).execute()
+    end_index = doc["body"]["content"][-1]["endIndex"]
+    if end_index > 2:
+        docs.documents().batchUpdate(
+            documentId=doc_id, body={"requests": [{"deleteContentRange": {"range": {"startIndex": 1, "endIndex": end_index - 1}}}]}
+        ).execute()
+
+
+def replace_content_briefs_doc(settings: Settings, markdown: str) -> str:
+    """Overskriver hele innholdet i det dedikerte innholdsforslag-dokumentet med denne
+    kjøringens 2-3 forslag — i motsetning til prepend_report_section (som bygger en
+    løpende historikk), er dette alltid KUN de nyeste forslagene, ikke en logg.
+
+    Samme opprettelsesbegrensning som prepend_report_section — dokumentet må finnes fra
+    før (opprettet manuelt av et menneske, delt med service-kontoen som Redaktør)."""
+    doc_id = find_content_briefs_doc(settings)
+    if not doc_id:
+        raise ContentBriefsDocNotFound(
+            f"Fant ikke et Google Doc med navnet «{settings.google_content_briefs_doc_name}» i "
+            f"mappen (ID {settings.google_drive_folder_id}). Opprett et tomt Google Doc med "
+            "akkurat dette navnet i mappen (som deg selv, ikke service-kontoen), og pass på "
+            "at mappen fortsatt er delt med service-kontoen som Redaktør."
+        )
+
+    creds = _credentials(settings)
+    docs = build("docs", "v1", credentials=creds, cache_discovery=False)
+
+    _clear_document(docs, doc_id)
+    requests_ = _markdown_to_requests(markdown.strip())
+    docs.documents().batchUpdate(documentId=doc_id, body={"requests": requests_}).execute()
+
+    url = f"https://docs.google.com/document/d/{doc_id}/edit"
+    logger.info("Innholdsforslag-dokument oppdatert: %s", url)
+    return url
+
+
 def prepend_report_section(settings: Settings, title: str, markdown: str) -> str:
     """Setter inn ukens rapport øverst i det løpende dokumentet (nyeste først).
 

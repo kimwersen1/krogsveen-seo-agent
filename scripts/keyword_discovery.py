@@ -4,9 +4,12 @@
 Tre ting sjekkes:
   1. Søkeord Krogsveen allerede rangerer på, men ikke sporer (bør legges til Rank Tracker).
   2. Søkeord konkurrenter rangerer godt på som Krogsveen ikke har synlighet på (innholdshull).
-  3. Ved --to-drive: Claude foreslår konkrete artikkel-/sideideer basert på 1+2
-     (src/report/content_suggestions.py) — ikke kjørt ved konsoll-only-kjøring, siden det
-     koster en ekstra Anthropic-samtale uten at noen leser resultatet.
+  3. Ved --to-drive: Claude foreslår 2-3 grundige artikkelforslag (SEO + GEO) basert på 1+2
+     (src/report/content_suggestions.py), skrevet til et EGET Google Doc («Krogsveen SEO –
+     Innholdsforslag», overskrevet hver gang — ikke en punktliste i det løpende
+     rapport-dokumentet, brukeren fant det uoversiktlig 21.07.2026) — ikke kjørt ved
+     konsoll-only-kjøring, siden det koster en ekstra Anthropic-samtale uten at noen leser
+     resultatet.
 
 KOSTNAD: en full kjøring med alle 8 konkurrenter fra config.json (standard) bruker typisk
 12 000–16 000 Ahrefs-enheter (se subscription-info før/etter i output) — fortsatt under
@@ -34,9 +37,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.analysis.keyword_gap import find_competitor_gap_keywords, find_untracked_ranking_keywords  # noqa: E402
-from src.collectors import ahrefs  # noqa: E402
-from src.report.content_suggestions import suggest_content  # noqa: E402
-from src.report.drive_writer import prepend_report_section  # noqa: E402
+from src.collectors import ahrefs, storage  # noqa: E402
+from src.report.content_suggestions import format_content_briefs_markdown, generate_content_briefs  # noqa: E402
+from src.report.drive_writer import prepend_report_section, replace_content_briefs_doc  # noqa: E402
 from src.settings import load_settings  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -104,7 +107,7 @@ def format_console(result: dict) -> None:
         )
 
 
-def format_markdown(result: dict, content_suggestions: str | None = None) -> str:
+def format_markdown(result: dict, briefs_doc_url: str | None = None) -> str:
     lines = [
         "## Søkeord Krogsveen allerede rangerer på, men ikke sporer",
         "Kandidater for å legges til manuelt i Ahrefs Rank Tracker "
@@ -133,8 +136,12 @@ def format_markdown(result: dict, content_suggestions: str | None = None) -> str
             f"Krogsveen: {row['krogsveen_position'] or 'ingen rangering'}) — {clusters_label}"
         )
 
-    if content_suggestions:
-        lines += ["", "## Forslag til nye artikler/publiseringer", content_suggestions]
+    if briefs_doc_url:
+        lines += [
+            "",
+            "## Innholdsforslag",
+            f"2-3 grundige artikkelforslag (SEO + GEO) er skrevet til et eget dokument: {briefs_doc_url}",
+        ]
 
     return "\n".join(lines)
 
@@ -163,10 +170,20 @@ def main() -> None:
     print(f"\nEnheter brukt i denne kjøringen: ~{used_after - used_before}")
 
     if args.to_drive:
-        print("\nBer Claude om forslag til nye artikler/publiseringer basert på gap-listen...")
-        content_suggestions = suggest_content(settings, result["untracked"], result["gaps"])
+        print("\nBer Claude om 2-3 grundige innholdsforslag (SEO + GEO) basert på gap-listen...")
+        briefs = generate_content_briefs(settings, result["untracked"], result["gaps"])
+        briefs_doc_url = None
+        if briefs:
+            today_label = date.today().isoformat()
+            briefs_markdown = format_content_briefs_markdown(briefs, today_label)
+            briefs_doc_url = replace_content_briefs_doc(settings, briefs_markdown)
+            conn = storage.get_connection()
+            storage.save_content_briefs_meta(conn, briefs_doc_url, today_label, len(briefs))
+            conn.close()
+            print(f"Innholdsforslag skrevet til: {briefs_doc_url}")
+
         title = f"Søkeordsoppdagelse – {date.today().strftime('%B %Y')}"
-        url = prepend_report_section(settings, title, format_markdown(result, content_suggestions))
+        url = prepend_report_section(settings, title, format_markdown(result, briefs_doc_url))
         print(f"\nSkrevet til Drive-dokument: {url}")
 
 
