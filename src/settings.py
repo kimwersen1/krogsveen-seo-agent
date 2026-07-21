@@ -109,7 +109,11 @@ def load_settings() -> Settings:
         # Valgfrie — del av erstatningen for Ahrefs Brand Radar (21.07.2026), samme
         # mønster som ChatGPT-selvsjekken: hopper stille over seg selv uten nøkkel.
         gemini_api_key=_optional("GEMINI_API_KEY"),
-        gemini_model=_optional("GEMINI_MODEL", "gemini-2.0-flash"),
+        # "gemini-flash-lite-latest" i stedet for en pinnet versjon — Gemini-modeller
+        # deprekeres uvanlig raskt (gemini-2.0-flash og gemini-2.5-flash-lite ble begge
+        # 404 "no longer available" i løpet av samme testøkt, 21.07.2026). Alias unngår
+        # at pipelinen brekker hver gang Google roterer modeller.
+        gemini_model=_optional("GEMINI_MODEL", "gemini-flash-lite-latest"),
         perplexity_api_key=_optional("PERPLEXITY_API_KEY"),
         perplexity_model=_optional("PERPLEXITY_MODEL", "sonar"),
         clusters=_load_json("clusters.json"),
