@@ -152,7 +152,7 @@ def update_dashboard_sheet(settings: Settings, payload: dict) -> str:
         ["AI Overview-søkeord", payload.get("ai_overview_count"), ""],
         ["Claude nevner Krogsveen", f"{payload.get('claude_mentions')} / {payload.get('claude_total')}", ""],
         ["", "", ""],
-        ["Cluster", "Antall", "Snittendring"],
+        ["Cluster", "Antall", "Snittendring (plasser bedre; negativt = dårligere)"],
     ]
     for c in payload.get("cluster_summaries", []):
         rows.append([c["name"], c["keyword_count"], round(c["avg_position_delta"], 2)])
@@ -170,11 +170,10 @@ def update_dashboard_sheet(settings: Settings, payload: dict) -> str:
         for point in anbefaling:
             rows.append([point, "", ""])
 
-    innholdsforslag = payload.get("innholdsforslag", [])
-    if innholdsforslag:
+    briefs_doc = payload.get("innholdsforslag_dokument")
+    if briefs_doc and briefs_doc.get("url"):
         rows += [["", "", ""], ["Innholdsforslag", "", ""]]
-        for point in innholdsforslag:
-            rows.append([point, "", ""])
+        rows.append([f"{briefs_doc.get('antall_forslag', '?')} forslag — {briefs_doc['url']}", "", f"Oppdatert {briefs_doc.get('updated_at', '')}"])
 
     ai_overview_rows = payload.get("ai_overview_sokeord", [])
     rows += [["", "", ""], ["Søkeord med AI Overview i SERP", "Cluster", ""]]

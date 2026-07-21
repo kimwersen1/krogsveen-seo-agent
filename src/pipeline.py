@@ -12,9 +12,7 @@ from src.analysis import clusters as cluster_analysis
 from src.analysis import diffs as diff_analysis
 from src.analysis import geo as geo_analysis
 from src.analysis import tiltak as tiltak_analysis
-from src.analysis.keyword_gap import find_untracked_ranking_keywords
 from src.collectors import ahrefs, chatgpt_geo, claude_geo, gsc, gsc_oauth, storage
-from src.report.content_suggestions import parse_bullets, suggest_content
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
 from src.report.generate import extract_recommendations, generate_report
@@ -140,6 +138,7 @@ def run_pipeline(
             }
         )
 
+    gsc_source = "ingen"
     if settings.gsc_oauth_configured:
         # Direkte tilgang via brukerens egen Google-konto — se src/collectors/gsc_oauth.py
         # for hvorfor dette virker uten admin-tilgang. Samme etterslep-justerte sluttdato
@@ -151,6 +150,7 @@ def run_pipeline(
             gsc_page_rows = gsc_oauth.get_page_performance(
                 settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
             )
+            gsc_source = "oauth"
         except HttpError as e:
             logger.warning("GSC OAuth-henting feilet denne uken: %s", e)
             data_gaps.append(f"GSC OAuth-henting feilet denne uken ({e}) — klikk/CTR per søkeord mangler.")
@@ -158,6 +158,7 @@ def run_pipeline(
     elif gsc_query_export or gsc_page_export:
         gsc_query_rows = gsc.import_gsc_export(gsc_query_export, "query") if gsc_query_export else []
         gsc_page_rows = gsc.import_gsc_export(gsc_page_export, "page") if gsc_page_export else []
+        gsc_source = "csv"
     else:
         gsc_query_rows, gsc_page_rows = [], []
         data_gaps.append(
@@ -227,13 +228,11 @@ def run_pipeline(
     )
     footprint_trend = storage.get_organic_footprint_trend(conn, weeks=12)
 
-    # Gratis (gjenbruker footprint-data over) ukentlig innholdsforslag i dashboard —
-    # kun untracked-siden av gap-analysen, ikke de dyrere konkurrent-sammenligningene
-    # (de kjøres i stedet to ganger i måneden via scripts/keyword_discovery.py --to-drive).
-    tracked_keywords = {r["keyword"] for r in rank_desktop if r.get("keyword")}
-    weekly_untracked = find_untracked_ranking_keywords(tagged_footprint, tracked_keywords, settings.clusters)
-    content_suggestions_markdown = suggest_content(settings, weekly_untracked, [])
-    content_suggestions = parse_bullets(content_suggestions_markdown)
+    # Innholdsforslag genereres kun to ganger i måneden (scripts/keyword_discovery.py
+    # --to-drive, dyrere konkurrent-gap-data gir bedre forslag enn den ukentlige gratis
+    # untracked-only-dataen gjorde) — dashboardet leser bare siste kjente lenke her, slik
+    # at det viser noe selv de ukene den bi-ukentlige jobben ikke kjører.
+    content_briefs_meta = storage.get_content_briefs_meta(conn)
 
     conn.close()
 
@@ -244,6 +243,7 @@ def run_pipeline(
         "domain_rating": domain_rating,
         "site_metrics": site_metrics,
         "gsc_site": gsc_site_rows,
+        "gsc_kilde": gsc_source,
         "cluster_summaries": [vars(c) for c in cluster_summaries],
         "avvik": anomalies,
         "organisk_fotavtrykk": {
@@ -260,7 +260,7 @@ def run_pipeline(
         },
         "tiltak": tiltak_status,
         "konkurrenter": settings.competitors,
-        "innholdsforslag": content_suggestions,
+        "innholdsforslag_dokument": content_briefs_meta,
         "datamangler": data_gaps,
     }
 
