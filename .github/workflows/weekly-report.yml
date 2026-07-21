@@ -53,7 +53,11 @@ jobs:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
           GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
-          GOOGLE_SEARCH_CONSOLE_PROPERTY: ${{ secrets.GOOGLE_SEARCH_CONSOLE_PROPERTY }}
+          # GOOGLE_SEARCH_CONSOLE_PROPERTY er IKKE satt her med vilje — standardverdien i
+          # settings.py (sc-domain:krogsveen.no) er riktig, og en GitHub-secret som ikke
+          # finnes ville satt env-variabelen til en tom streng (ikke "usatt"), som
+          # overstyrer Python sin default og feiler mot Search Console API (skjedde
+          # 21.07.2026: 'http://' is not a valid Search Console site URL).
         run: python scripts/run_weekly.py
 
       # data/history.db er unntatt fra .gitignore med vilje — uten dette starter hver
