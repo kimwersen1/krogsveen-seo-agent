@@ -34,7 +34,16 @@ prosa uten eksplisitte spørsmål-overskrifter, mens sider som /e-takst allerede
 Krogsveen kan skrive god Q&A-struktur når de vil. Nye artikkelforslag bør derfor inkludere
 minst 2-3 eksplisitte spørsmålsoverskrifter som matcher reelle søkefraser (f.eks. "Hvor mye
 koster e-takst?", "Hvor lenge er en e-takst gyldig?") i tillegg til den varme narrative
-tonen — ikke bytte den ut."""
+tonen — ikke bytte den ut.
+
+VIKTIG MERKEVAREREGEL (fra bruker, 21.07.2026): Krogsveen er en av landets største
+eiendomsmeglere og skriver nøkternt — ALDRI sammenlign eller nevn navngitte
+meglerkonkurrenter (hjemla.no, DNB Eiendom, Eiendomsmegler1, osv.) i et forslag, selv om
+konkurrent-gap-dataen under viser hvilket firma som rangerer på et ord. Bruk gap-dataen
+kun til å identifisere SELVE SØKEORDET/BEHOVET som mangler dekning, ikke til å foreslå
+sammenligningsinnhold ("Krogsveen vs [konkurrent]" e.l.). Skryt ikke av størrelse eller
+overdriv — behold den nøkterne, faktabaserte tonen selv i forslag rettet mot
+konkurransetunge søkeord."""
 
 SYSTEM_PROMPT = f"""Du er en SEO/GEO-innholdsstrateg for krogsveen.no, en norsk eiendomsmegler.
 Du får en liste søkeord Krogsveen enten rangerer på uten å spore det i Rank Tracker, eller
