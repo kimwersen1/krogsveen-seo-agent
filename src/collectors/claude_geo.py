@@ -1,14 +1,16 @@
 """Claude-basert GEO-selvsjekk — spør Claude de samme spørsmålene ekte brukere ville
 stilt en LLM, og sjekker om Krogsveen eller konkurrenter blir nevnt i svaret.
 
-Erstatter IKKE Brand Radar (som dekker ChatGPT/Gemini/Perplexity/AI Overviews/AI Mode —
-se src/collectors/ahrefs.py sine brand_radar-funksjoner, men krever en Ahrefs-plan
-Krogsveen ikke har per 20.07.2026), men er et gratis, robust, automatiserbart supplement
-for nettopp Claude. Se src/collectors/chatgpt_geo.py for samme sjekk mot ChatGPT.
+Gratis, robust, automatiserbart — en av fire selvsjekk-kilder (se også chatgpt_geo.py,
+gemini_geo.py, perplexity_geo.py). Disse fire erstattet Ahrefs Brand Radar helt
+(21.07.2026) — Brand Radar var begrenset til 5 prompts totalt med skrivebeskyttet API
+(ingen automatisk rotasjon mulig), mens denne egne selvsjekken kjører alle 36 GEO-prompts
+mot fire reelle LLM-er.
 
 Bevisst IKKE bygget: skraping av Google/Perplexity sine nettsider for kontinuerlig,
 ubevoktet automatisering. Det er skjørt (bot-deteksjon stoppet et manuelt forsøk mot
-Perplexity samme dag dette ble bygget) og ToS-risikofylt å basere en cron-jobb på.
+Perplexity samme dag dette ble bygget) og ToS-risikofylt å basere en cron-jobb på —
+Perplexity dekkes i stedet via deres offisielle API (se perplexity_geo.py).
 """
 from __future__ import annotations
 

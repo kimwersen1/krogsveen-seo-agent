@@ -39,7 +39,6 @@ def _load_json(name: str) -> dict:
 class Settings:
     ahrefs_api_key: str
     ahrefs_project_id: int
-    ahrefs_brand_radar_report_id: str
     google_service_account_json: Path
     google_drive_folder_id: str
     google_report_doc_name: str
@@ -86,7 +85,6 @@ def load_settings() -> Settings:
     return Settings(
         ahrefs_api_key=_require("AHREFS_API_KEY"),
         ahrefs_project_id=int(_require("AHREFS_PROJECT_ID")),
-        ahrefs_brand_radar_report_id=_require("AHREFS_BRAND_RADAR_REPORT_ID"),
         google_service_account_json=Path(_require("GOOGLE_SERVICE_ACCOUNT_JSON")),
         google_drive_folder_id=_require("GOOGLE_DRIVE_FOLDER_ID"),
         google_report_doc_name=_optional("GOOGLE_REPORT_DOC_NAME", "SEO-ukentlig rapport Krogsveen"),

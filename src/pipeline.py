@@ -74,7 +74,7 @@ def run_pipeline(
         limit = usage.get("units_limit_api_key") or usage.get("units_limit_workspace")
         data_gaps.append(
             f"Ahrefs-kvote >80% brukt ({used}/{limit} enheter) "
-            "— enhets-kostende kall (domain rating, metrics, brand radar) ble hoppet over denne uken."
+            "— enhets-kostende kall (domain rating, metrics) ble hoppet over denne uken."
         )
 
     rank_desktop = ahrefs.get_rank_tracker_overview(
@@ -84,17 +84,12 @@ def run_pipeline(
         settings, windows["ahrefs_date"].isoformat(), windows["ahrefs_date_compared"].isoformat(), device="mobile"
     )
 
-    domain_rating, site_metrics, brand_mentions, brand_sov, cited_pages = None, None, [], [], []
+    domain_rating, site_metrics = None, None
     competitor_benchmark: list[dict] = []
     footprint_rows: list[dict] = []
     if not over_budget:
         domain_rating = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat())
         site_metrics = ahrefs.get_site_metrics(settings, windows["ahrefs_date"].isoformat())
-        brand_mentions = ahrefs.get_brand_radar_mentions(settings)
-        brand_sov = ahrefs.get_brand_radar_sov(settings)
-        cited_pages = ahrefs.get_brand_radar_cited_pages(settings)
-        if not brand_mentions:
-            data_gaps.append("Brand Radar: tomt svar — prompts er trolig ikke konfigurert i Ahrefs UI ennå.")
 
         for competitor in (settings.competitors or DASHBOARD_COMPETITORS_FALLBACK):
             comp_dr = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat(), target=competitor)
@@ -183,12 +178,6 @@ def run_pipeline(
             entry["clicks_prev"] = prev_by_query.get(keyword, 0)
     if gsc_page_rows:
         storage.save_gsc_rows(conn, week_start_label, "page", gsc_page_rows)
-    if brand_mentions:
-        merged_brand_rows = {r["brand"]: dict(r) for r in brand_mentions}
-        for r in brand_sov:
-            merged_brand_rows.setdefault(r["brand"], {"brand": r["brand"]})
-            merged_brand_rows[r["brand"]]["share_of_voice"] = r.get("share_of_voice")
-        storage.save_brand_radar_rows(conn, week_start_label, list(merged_brand_rows.values()))
 
     geo_selfcheck = claude_geo.check_geo_visibility(settings)
     storage.save_geo_selfcheck_rows(conn, week_start_label, geo_selfcheck, source="claude")
@@ -237,8 +226,6 @@ def run_pipeline(
         tagged_desktop, gsc_by_keyword, settings.posisjon_terskel, settings.klikk_terskel_pct
     )
     ai_overview_keywords = geo_analysis.keywords_with_ai_overview(tagged_desktop)
-    sov_summary = geo_analysis.summarize_share_of_voice(brand_sov)
-    mentions_summary = geo_analysis.summarize_mentions(brand_mentions)
 
     history_rows = storage.get_history(conn, "rank_tracker_weekly", weeks=8)
     tiltak_status = tiltak_analysis.classify_all(settings.tiltak, history_rows, today)
@@ -278,9 +265,6 @@ def run_pipeline(
         },
         "geo": {
             "ai_overview_sokeord": ai_overview_keywords,
-            "brand_radar_share_of_voice": sov_summary,
-            "brand_radar_omtaler": mentions_summary,
-            "brand_radar_siterte_sider": cited_pages,
             "claude_selvsjekk": geo_selfcheck,
             "chatgpt_selvsjekk": chatgpt_selfcheck,
             "gemini_selvsjekk": gemini_selfcheck,

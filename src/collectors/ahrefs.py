@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://api.ahrefs.com/v3"
 
 RANK_TRACKER_SELECT = "keyword,position,position_prev,volume,url,serp_features"
-BRAND_RADAR_DATA_SOURCES = "chatgpt,gemini,perplexity,google_ai_overviews,google_ai_mode"
 
 # I motsetning til Anthropic/OpenAI-klientene (max_retries=5) hadde disse rå requests-
 # kallene ingen retry-logikk — en ren nettverksblunk (ConnectionResetError) veltet hele
@@ -178,39 +177,6 @@ def get_site_metrics_history(
     return data.get("metrics", [])
 
 
-def get_brand_radar_mentions(settings: Settings) -> list[dict]:
-    """brand-radar/mentions-overview — omtaler per AI-kilde. Kan være tomt hvis prompts ikke er konfigurert."""
-    data = _get(
-        settings,
-        "brand-radar/mentions-overview",
-        {
-            "select": "brand,total,only_target_brand,target_and_competitors_brands,only_competitors_brands",
-            "data_source": BRAND_RADAR_DATA_SOURCES,
-            "report_id": settings.ahrefs_brand_radar_report_id,
-            "output": "json",
-        },
-    )
-    rows = data.get("metrics", [])
-    if not rows:
-        logger.warning("brand-radar/mentions-overview: tomt svar — prompts trolig ikke konfigurert i Ahrefs UI")
-    return rows
-
-
-def get_brand_radar_sov(settings: Settings) -> list[dict]:
-    """brand-radar/sov-overview — share-of-voice per merke/AI-kilde."""
-    data = _get(
-        settings,
-        "brand-radar/sov-overview",
-        {
-            "select": "brand,share_of_voice",
-            "data_source": BRAND_RADAR_DATA_SOURCES,
-            "report_id": settings.ahrefs_brand_radar_report_id,
-            "output": "json",
-        },
-    )
-    return data.get("metrics", [])
-
-
 def get_gsc_performance_history(
     settings: Settings, date_from: str, date_to: str | None = None, history_grouping: str = "weekly"
 ) -> list[dict]:
@@ -240,22 +206,6 @@ def get_gsc_performance_by_device(settings: Settings, date_from: str, date_to: s
         {"project_id": settings.ahrefs_project_id, "date_from": date_from, "date_to": date_to, "output": "json"},
     )
     return data.get("metrics", [])
-
-
-def get_brand_radar_cited_pages(settings: Settings, limit: int = 20) -> list[dict]:
-    """brand-radar/cited-pages — hvilke sider AI-kilder siterer."""
-    data = _get(
-        settings,
-        "brand-radar/cited-pages",
-        {
-            "select": "url,responses",
-            "data_source": BRAND_RADAR_DATA_SOURCES,
-            "report_id": settings.ahrefs_brand_radar_report_id,
-            "limit": limit,
-            "output": "json",
-        },
-    )
-    return data.get("pages", [])
 
 
 def get_organic_keywords(
