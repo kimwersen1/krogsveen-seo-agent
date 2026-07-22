@@ -10,19 +10,22 @@ REPORT_FORMAT = """
    synlige søkeord per cluster) som context der det er relevant, f.eks. hvis et cluster
    har mange usporede søkeord med god posisjon, eller påfallende få totalt — ikke behandle
    det som samme datakilde som cluster_summaries (ingen uke-mot-uke-delta her ennå).
-3. GEO — presenter som TO ATSKILTE deler, ikke slått sammen:
-   a) Brand Radar (ChatGPT/Gemini/Perplexity/AI Overviews/AI Mode): omtaler + share-of-voice.
-      Hvis alt er 0 — si eksplisitt at prompts ikke er konfigurert ennå i Ahrefs UI, ikke at
-      Krogsveen er fraværende fra disse kildene (det er ukjent, ikke bekreftet).
-   b) Claude-selvsjekk (geo.claude_selvsjekk): hvor mange av prompt-ene nevnte Krogsveen vs.
-      hvilke konkurrenter, med 1-2 konkrete eksempler. Dette ER ekte data, presenter det som det.
-      Bruk sentiment/sentiment_begrunnelse-feltene der Krogsveen er nevnt — nevn eksplisitt om
-      omtalen er positiv/nøytral/negativ og hvorfor, ikke bare at merket ble nevnt.
-   c) ChatGPT-selvsjekk (geo.chatgpt_selvsjekk) — samme metode, samme prompts, mot OpenAI.
-      Tom liste betyr ikke konfigurert (ingen OPENAI_API_KEY), ikke at ChatGPT ble sjekket
-      og ikke fant noe — vær presis på denne forskjellen. Hvis begge selvsjekkene har data,
-      trekk gjerne fram hvis Claude og ChatGPT er uenige om Krogsveen nevnes eller ikke.
-   d) Søkeord med ai_overview i SERP (fra Ahrefs rank tracker).
+3. GEO — egen selvsjekk mot fire LLM-er (geo.claude_selvsjekk / chatgpt_selvsjekk /
+   gemini_selvsjekk / perplexity_selvsjekk), samme 36 prompts kjørt mot alle. Dette ER
+   ekte data, presenter det som det:
+   a) For hver kilde: hvor mange av prompt-ene nevnte Krogsveen vs. hvilke konkurrenter,
+      med 1-2 konkrete eksempler. Bruk sentiment/sentiment_begrunnelse der Krogsveen er
+      nevnt — nevn eksplisitt om omtalen er positiv/nøytral/negativ og hvorfor.
+      Perplexity har i tillegg krogsveen_cited (om krogsveen.no faktisk ble sitert som
+      kilde, ikke bare nevnt i teksten) — dette er det sterkeste GEO-signalet av de fire,
+      fremhev det spesielt.
+      En tom liste for en kilde betyr at API-nøkkelen ikke er konfigurert (valgfritt for
+      ChatGPT/Gemini/Perplexity), ikke at kilden ble sjekket og ikke fant noe — vær presis
+      på denne forskjellen.
+   b) Trekk fram tydelig uenighet mellom kildene der det finnes (f.eks. hvis Krogsveen
+      nevnes hos Claude/Gemini men ikke ChatGPT/Perplexity) — det er ofte mer informativt
+      enn gjennomsnittet.
+   c) Søkeord med ai_overview i SERP (fra Ahrefs rank tracker).
 4. Tiltaks-effekt.
 5. Avvik (>3 pos / >20 % klikk).
 6. Anbefaling for kommende uke (2–3 punkter).
@@ -35,8 +38,8 @@ Rapporten skal være konklusjonsdrevet, maks 2 sider, på norsk, og følge nøya
 {REPORT_FORMAT}
 
 Du får strukturert analysedata som JSON — ikke gjenta rådata, syntetiser og konkluder.
-Vær ærlig når data mangler (f.eks. Brand Radar uten konfigurerte prompts, GSC-hull) i stedet for
-å late som alt er komplett.
+Vær ærlig når data mangler (f.eks. en GEO-kilde uten konfigurert API-nøkkel, GSC-hull) i
+stedet for å late som alt er komplett.
 Skriv i seksjoner med tydelige overskrifter ("## Overskrift") og punktlister ("- punkt") i markdown,
 klar for direkte konvertering til Google Docs. Ingen innledende hilsen, og ingen egen tittel/H1 øverst
 (rapporten settes inn under en tittel som allerede finnes) — start rett på "## 1. Hovedbildet"."""

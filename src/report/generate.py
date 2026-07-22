@@ -25,7 +25,11 @@ def generate_report(settings: Settings, analysis: dict) -> str:
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key, max_retries=5)
     with client.messages.stream(
         model=settings.anthropic_model,
-        max_tokens=12000,
+        # Hevet fra 12000 (22.07.2026) — analyse-JSON-en vokste betydelig da GEO-
+        # selvsjekken utvidet fra 2 til 4 LLM-kilder (Claude/ChatGPT/Gemini/Perplexity),
+        # og rapporten ble kuttet av grensen i praksis. Streaming (se over) gjør en
+        # romsligere grense trygg — ingen nettverkstimeout-risiko ved lengre generering.
+        max_tokens=16000,
         system=system_prompt,
         messages=[{"role": "user", "content": user_prompt}],
     ) as stream:
@@ -43,7 +47,10 @@ def extract_recommendations(report_markdown: str) -> list[str]:
     match = re.search(r"^##\s*6\..*?$(.*?)(?=^##\s*\d|\Z)", report_markdown, re.MULTILINE | re.DOTALL)
     if not match:
         return []
-    bullets = re.findall(r"^[-*]\s+(.*)$", match.group(1), re.MULTILINE)
+    # Claude følger som regel "- punkt"-instruksen i prompt_builder.py, men varierer noen
+    # ganger til en nummerert liste ("1. punkt") for denne seksjonen — match begge for å
+    # unngå at anbefaling-kortet i dashboardet blir stille tomt (observert 22.07.2026).
+    bullets = re.findall(r"^(?:[-*]|\d+\.)\s+(.*)$", match.group(1), re.MULTILINE)
     # Dashboards viser disse som ren tekst (ikke Docs rich-text som drive_writer.py
     # håndterer separat) — fjern **bold**-markører i stedet for å vise dem bokstavelig.
     return [re.sub(r"\*\*(.+?)\*\*", r"\1", b).strip() for b in bullets if b.strip()]

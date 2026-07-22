@@ -37,10 +37,15 @@ Rapporten skal være konklusjonsdrevet, maks 2 sider, på norsk.
   csv-output — retry uten serp_features som fallback.
 - `site-explorer/domain-rating`: target krogsveen.no (50 enheter per kall).
 - `site-explorer/metrics|metrics-history`: trafikk-estimat, mode subdomains.
-- Brand Radar (GEO): **report_id 019f5beb-5f1a-7d06-ae2d-4458c86782ee**, kilder
-  chatgpt, gemini, perplexity, google_ai_overviews, google_ai_mode (ukentlig).
-  `brand-radar/mentions-overview`, `sov-overview`, `mentions-history`, `cited-pages`.
-  **Status: prompts må konfigureres i Ahrefs UI før data flyter** (per 16.07.2026 tomt).
+- Brand Radar (GEO) er **fjernet** (21.07.2026) — begrenset til 5 prompts totalt med
+  skrivebeskyttet API (ingen automatisk rotasjon mulig), vurdert for tynt til å gi et
+  godt grunnlag. Erstattet av en egen GEO-selvsjekk (se `src/collectors/claude_geo.py`,
+  `chatgpt_geo.py`, `gemini_geo.py`, `perplexity_geo.py`) som kjører alle 36
+  `geo_prompts` fra `config.json` mot fire reelle LLM-er ukentlig — dekker 4 av Brand
+  Radar sine 5 datakilder direkte (ChatGPT/Gemini/Perplexity/Google AI Overviews via
+  Ahrefs SERP-features), pluss krogsveen_cited-sporing for Perplexity (siterer
+  krogsveen.no som kilde, ikke bare nevner merket — sterkere GEO-signal). Google AI Mode
+  har ingen offentlig API og er en akseptert dekningsmangel.
 - `subscription-info/limits-and-usage` (gratis): sjekk før kjøring; Lite-plan = 100 000 enheter/mnd.
   Budsjettregel: hopp over enhets-kostende kall hvis >80 % brukt, noter i rapport.
 
@@ -67,14 +72,15 @@ og markere tiltak som «bekreftet effekt» / «avventer» / «ingen effekt etter
 ## Rapportformat
 
 1. Hovedbildet (3–5 setninger). 2. Per cluster: snittendring, antall opp/ned, topp 3
-bevegelser hver vei. 3. GEO: omtaler + share-of-voice per AI-kilde, søkeord med
-ai_overview i SERP. 4. Tiltaks-effekt. 5. Avvik (>3 pos / >20 % klikk). 6. Anbefaling
-for kommende uke (2–3 punkter). Ærlig om datamangler. Ingen rådata-dumper.
+bevegelser hver vei. 3. GEO: selvsjekk-resultater (nevnt/sitert) per LLM-kilde
+(Claude/ChatGPT/Gemini/Perplexity), søkeord med ai_overview i SERP. 4. Tiltaks-effekt.
+5. Avvik (>3 pos / >20 % klikk). 6. Anbefaling for kommende uke (2–3 punkter).
+Ærlig om datamangler. Ingen rådata-dumper.
 
 ## Kjente forhold / fallgruver
 
-- GSC via Ahrefs API gir tomt svar tross fungerende UI-kobling → bygg GSC direkte.
-- Brand Radar-brand returneres som «www.krogsveen.no»; prompts mangler (per 16.07).
+- GSC via Ahrefs API gir tomt svar tross fungerende UI-kobling → bygg GSC direkte
+  (løst: OAuth med brukerens egen konto, se `src/collectors/gsc_oauth.py`).
 - Rank Tracker-data har mange null-posisjoner på desktop; kjør mobile i tillegg.
 - «Basic»-verifisering i Ahrefs-prosjektet; ikke alle 400 ord returneres (fikk 100 rader
   ved limit 400 — undersøk paginering).
@@ -86,10 +92,20 @@ for kommende uke (2–3 punkter). Ærlig om datamangler. Ingen rådata-dumper.
 
 ## Roadmap etter v1
 
-1. GSC direkte + klikk/CTR-lag i rapporten.
-2. Historikk-database → trendgrafer (4/12 ukers glidende).
-3. Live dashboard (statisk side generert per kjøring, eller Looker Studio på GSC/BigQuery).
+1. ~~GSC direkte + klikk/CTR-lag i rapporten.~~ **Ferdig** — OAuth med brukerens egen
+   konto (`src/collectors/gsc_oauth.py`), engangsoppsett via `scripts/gsc_auth_setup.py`.
+2. ~~Historikk-database → trendgrafer (4/12 ukers glidende).~~ **Ferdig** — SQLite
+   (`data/history.db`), posisjon/klikk/organisk fotavtrykk over tid.
+3. ~~Live dashboard.~~ **Ferdig** — statisk side (`docs/index.html`) generert per
+   kjøring, publisert via GitHub Pages, pluss Google Sheet-versjon.
 4. SERP-vakt: varsle når AI Overview dukker opp på cluster-ord, eller konkurrent
-   passerer på topp-ord (rank-tracker/competitors-overview).
-5. Månedlig GEO-stikkprøve: kjør prompt-listen mot ChatGPT/Perplexity via API og
-   logg Krogsveen-sitater (supplement til Brand Radar).
+   passerer på topp-ord (rank-tracker/competitors-overview). Ikke bygget ennå.
+5. ~~Månedlig GEO-stikkprøve mot ChatGPT/Perplexity (supplement til Brand Radar).~~
+   **Ferdig, og utvidet langt forbi opprinnelig plan** — ukentlig (ikke månedlig)
+   selvsjekk mot fire LLM-er (Claude/ChatGPT/Gemini/Perplexity), 36 prompts hver, med
+   sentiment og (for Perplexity) faktisk sitat-sporing. Erstatter Brand Radar helt,
+   ikke bare et supplement.
+6. Sporbare "aktive forslag" — anbefalinger fra rapporten koblet til `tiltak.json` med
+   status som kan markeres utført, ikke bare tekst som forsvinner etter én uke.
+7. GA4-integrasjon for ekte konverteringsdata (leads, kontaktskjema, budforespørsler
+   per landingsside/cluster).

@@ -1,9 +1,11 @@
 """Gemini-basert GEO-selvsjekk — samme metode som src/collectors/claude_geo.py, mot
-Googles Gemini API i stedet for Anthropic sin. Krever GEMINI_API_KEY (se .env.example) —
-gratis å komme i gang med via aistudio.google.com/apikey (generøs gratis kvote).
+Googles Gemini API i stedet for Anthropic sin. Krever GEMINI_API_KEY fra
+aistudio.google.com/apikey — NB: gratiskvoten viste seg å være 0 uansett GCP-prosjekt for
+denne kontoen (trolig regional begrensning), fakturering måtte aktiveres. Kostnad er
+uansett svært lav for gemini-flash-lite-latest.
 
 Del av erstatningen for Ahrefs Brand Radar (kun 5 prompts, ingen skriv-API for rotasjon,
-se beslutning 21.07.2026) — Brand Radar sin "gemini"-datakilde dekkes nå direkte her,
+besluttet fjernet 21.07.2026) — Brand Radar sin "gemini"-datakilde dekkes nå direkte her,
 med alle 36 GEO-prompts i stedet for 5.
 """
 from __future__ import annotations

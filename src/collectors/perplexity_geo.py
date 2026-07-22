@@ -5,7 +5,7 @@ eget SDK. Krever PERPLEXITY_API_KEY (se .env.example) — betalt, men billig per
 (perplexity.ai/settings/api).
 
 Del av erstatningen for Ahrefs Brand Radar (kun 5 prompts, ingen skriv-API for rotasjon,
-se beslutning 21.07.2026) — Brand Radar sin "perplexity"-datakilde dekkes nå direkte her.
+besluttet fjernet 21.07.2026) — Brand Radar sin "perplexity"-datakilde dekkes nå direkte her.
 
 STERKERE SIGNAL enn de andre selvsjekkene: Perplexity-modellene (sonar/sonar-pro) gjør
 alltid live websøk og returnerer en citations-liste (kildeurl-er) sammen med svaret. Vi

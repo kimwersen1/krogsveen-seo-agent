@@ -31,17 +31,6 @@ CREATE TABLE IF NOT EXISTS gsc_weekly (
     PRIMARY KEY (week_start, dimension, key)
 );
 
-CREATE TABLE IF NOT EXISTS brand_radar_weekly (
-    week_start TEXT NOT NULL,
-    brand TEXT NOT NULL,
-    total INTEGER,
-    only_target_brand INTEGER,
-    target_and_competitors_brands INTEGER,
-    only_competitors_brands INTEGER,
-    share_of_voice REAL,
-    PRIMARY KEY (week_start, brand)
-);
-
 CREATE TABLE IF NOT EXISTS gsc_site_weekly (
     week_start TEXT NOT NULL,
     device TEXT NOT NULL,
@@ -178,28 +167,6 @@ def save_gsc_rows(conn: sqlite3.Connection, week_start: str, dimension: str, row
     conn.commit()
 
 
-def save_brand_radar_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict]) -> None:
-    conn.executemany(
-        """INSERT OR REPLACE INTO brand_radar_weekly
-           (week_start, brand, total, only_target_brand, target_and_competitors_brands,
-            only_competitors_brands, share_of_voice)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        [
-            (
-                week_start,
-                r.get("brand"),
-                r.get("total"),
-                r.get("only_target_brand"),
-                r.get("target_and_competitors_brands"),
-                r.get("only_competitors_brands"),
-                r.get("share_of_voice"),
-            )
-            for r in rows
-        ],
-    )
-    conn.commit()
-
-
 def save_gsc_site_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict]) -> None:
     """rows: [{"device": "all"|"desktop"|"mobile"|"tablet", "clicks", "impressions", "ctr", "position"}]."""
     conn.executemany(
@@ -329,7 +296,6 @@ def get_history(conn: sqlite3.Connection, table: str, weeks: int = 12) -> list[d
     if table not in {
         "rank_tracker_weekly",
         "gsc_weekly",
-        "brand_radar_weekly",
         "gsc_site_weekly",
         "geo_selfcheck_weekly",
         "organic_footprint_weekly",

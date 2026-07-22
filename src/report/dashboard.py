@@ -178,7 +178,7 @@ _TEMPLATE = r"""<!doctype html>
   .chip.ok .dot { background: var(--good); }
   .chip.blocked { color: var(--critical); background: var(--critical-soft); border-color: color-mix(in srgb, var(--critical) 40%, var(--line-strong)); }
   .chip.blocked .dot { background: var(--critical); }
-  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .stat-tile { background: var(--bg-surface); padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 5px; }
   .stat-tile .label { font-size: 11.5px; color: var(--ink-muted); }
   .stat-tile .value { font-size: 24px; font-weight: 600; }
@@ -196,6 +196,7 @@ _TEMPLATE = r"""<!doctype html>
   tr.self td { background: var(--accent-soft); font-weight: 600; }
   .table-scroll { overflow-x: auto; }
   .cluster-row { display: grid; grid-template-columns: 100px 1fr 60px 150px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .cluster-header { font-size: 11px; color: var(--ink-muted); border-bottom: 1px solid var(--line-strong); padding-bottom: 8px; font-weight: 600; }
   .cluster-row:last-child { border-bottom: none; }
   .cluster-name { font-weight: 600; }
   .cluster-track { height: 7px; border-radius: 4px; background: var(--bg-surface-2); overflow: hidden; display: flex; }
@@ -284,6 +285,12 @@ _TEMPLATE = r"""<!doctype html>
   <div class="card">
     <h2>Cluster-bevegelse denne uken</h2>
     <div class="card-sub" id="cluster-sub"></div>
+    <div class="cluster-row cluster-header">
+      <span>Cluster</span>
+      <span>Fordeling av søkeord i clusteret: <span style="color:var(--good)">■ bedre</span> · <span style="color:var(--critical)">■ dårligere</span> · <span style="color:var(--ink-muted)">■ uendret</span></span>
+      <span style="text-align:right">Antall</span>
+      <span style="text-align:right">Snittendring</span>
+    </div>
     <div id="cluster-rows"></div>
   </div>
 
@@ -291,6 +298,11 @@ _TEMPLATE = r"""<!doctype html>
     <h2>Organisk fotavtrykk</h2>
     <div class="card-sub" id="footprint-sub">Bredere enn de 338 sporede Rank Tracker-ordene — hele domenets synlige søkeord (topp 50 posisjon)</div>
     <div id="footprint-rows"></div>
+  </div>
+
+  <div class="card">
+    <h2>Tiltaks-status</h2>
+    <div class="table-scroll"><table id="tiltak-table"><thead><tr><th>Side</th><th>Målord</th><th>Status</th><th>Uker aktiv</th></tr></thead><tbody></tbody></table></div>
   </div>
 
   <div class="card">
@@ -302,7 +314,7 @@ _TEMPLATE = r"""<!doctype html>
   <div class="two-col">
     <div class="card">
       <h2>GEO / AI-synlighet</h2>
-      <div class="card-sub">Egen selvsjekk mot Claude, ChatGPT, Gemini og Perplexity (ekte data) — erstatter Ahrefs Brand Radar (5 prompts, ingen rotasjon mulig)</div>
+      <div class="card-sub">Egen selvsjekk mot Claude, ChatGPT, Gemini og Perplexity — ekte data, 36 prompts hver</div>
       <div id="geo-panel"></div>
     </div>
     <div class="card">
@@ -310,11 +322,6 @@ _TEMPLATE = r"""<!doctype html>
       <div class="card-sub">Domain Rating og org. trafikk, denne uken</div>
       <div class="table-scroll"><table id="competitor-table"><thead><tr><th>Domene</th><th>DR</th><th>Org. trafikk/mnd</th></tr></thead><tbody></tbody></table></div>
     </div>
-  </div>
-
-  <div class="card">
-    <h2>Tiltaks-status</h2>
-    <div class="table-scroll"><table id="tiltak-table"><thead><tr><th>Side</th><th>Målord</th><th>Status</th><th>Uker aktiv</th></tr></thead><tbody></tbody></table></div>
   </div>
 
   <footer>
@@ -350,10 +357,6 @@ _TEMPLATE = r"""<!doctype html>
   };
   var gscChip = gscLabels[data.gsc_kilde] || gscLabels.ingen;
   addChip(gscChip[0], gscChip[1]);
-  var brandRadarOk = data.geo.brand_radar_omtaler && Object.keys(data.geo.brand_radar_omtaler).some(function(k) {
-    return data.geo.brand_radar_omtaler[k].total > 0;
-  });
-  addChip("Brand Radar", brandRadarOk);
   addChip("Claude-selvsjekk", true);
   if ((data.geo.chatgpt_selvsjekk || []).length) {
     addChip("ChatGPT-selvsjekk", true);
@@ -376,15 +379,26 @@ _TEMPLATE = r"""<!doctype html>
       (delta ? '<div class="delta">' + delta + '</div>' : "");
     statGrid.appendChild(tile);
   }
+  // Rad 1: generelle SEO-nøkkeltall. Rad 2: GEO-selvsjekk per kilde — 8 ruter totalt
+  // for en jevn 4x2-rutenett (bruker ba om dette 22.07.2026).
   addStat("Domain Rating", data.domain_rating ? data.domain_rating.domain_rating || "–" : "–");
+  addStat("Org. trafikk/mnd", data.site_metrics ? fmt.format(data.site_metrics.org_traffic || 0) : "–");
   var allDevice = (data.gsc_site || []).find(function (r) { return r.device === "all"; });
   addStat("GSC-klikk (uke)", allDevice ? fmt.format(allDevice.clicks) : "–",
     allDevice ? fmt.format(allDevice.impressions) + " visninger" : "");
   var aiCount = (data.geo.ai_overview_sokeord || []).length;
   addStat("AI Overview-eksponering", aiCount, "søkeord med AI Overview i SERP");
-  var claudeMentions = (data.geo.claude_selvsjekk || []).filter(function (r) { return r.krogsveen_mentioned; }).length;
-  var claudeTotal = (data.geo.claude_selvsjekk || []).length;
-  addStat("Claude nevner Krogsveen", claudeMentions + " / " + claudeTotal, "av kjørte GEO-prompts");
+
+  function addSelfcheckStat(label, rows) {
+    var mentions = (rows || []).filter(function (r) { return r.krogsveen_mentioned; }).length;
+    addStat(label, mentions + " / " + (rows || []).length, "av kjørte GEO-prompts");
+  }
+  addSelfcheckStat("Claude nevner Krogsveen", data.geo.claude_selvsjekk);
+  addSelfcheckStat("ChatGPT nevner Krogsveen", data.geo.chatgpt_selvsjekk);
+  addSelfcheckStat("Gemini nevner Krogsveen", data.geo.gemini_selvsjekk);
+  var perplexityRows = data.geo.perplexity_selvsjekk || [];
+  var perplexityCited = perplexityRows.filter(function (r) { return r.krogsveen_cited; }).length;
+  addStat("Perplexity siterer Krogsveen", perplexityCited + " / " + perplexityRows.length, "av kjørte GEO-prompts");
 
   // ---- Anbefaling for neste uke ----
   var anbefaling = data.anbefaling || [];
@@ -528,13 +542,6 @@ _TEMPLATE = r"""<!doctype html>
 
   // ---- GEO panel ----
   var geoPanel = document.getElementById("geo-panel");
-  var brandItem = document.createElement("div");
-  brandItem.className = "geo-item";
-  brandItem.innerHTML =
-    '<div class="geo-item-head"><span class="title">Brand Radar</span>' +
-    '<span class="status-chip ' + (brandRadarOk ? "ok" : "blocked") + '">' + (brandRadarOk ? "Aktiv" : "Ikke konfigurert") + '</span></div>' +
-    '<p>' + (brandRadarOk ? "Data flyter fra ChatGPT/Gemini/Perplexity/AI Overviews/AI Mode." : "Prompts mangler i Ahrefs UI — datakildene er satt til ukentlig, men ingen spørsmål er lagt inn ennå.") + '</p>';
-  geoPanel.appendChild(brandItem);
 
   function renderSelfcheckPanel(title, rows) {
     var item = document.createElement("div");
