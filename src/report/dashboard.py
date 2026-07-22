@@ -54,6 +54,8 @@ def build_sheet_payload(dashboard_payload: dict) -> dict:
     geo = dashboard_payload.get("geo", {})
     claude_rows = geo.get("claude_selvsjekk", [])
     chatgpt_rows = geo.get("chatgpt_selvsjekk", [])
+    gemini_rows = geo.get("gemini_selvsjekk", [])
+    perplexity_rows = geo.get("perplexity_selvsjekk", [])
     site_metrics = dashboard_payload.get("site_metrics") or {}
     domain_rating = dashboard_payload.get("domain_rating") or {}
     all_device = next((r for r in dashboard_payload.get("gsc_site", []) if r.get("device") == "all"), {})
@@ -75,12 +77,19 @@ def build_sheet_payload(dashboard_payload: dict) -> dict:
         "claude_total": len(claude_rows),
         "chatgpt_mentions": sum(1 for r in chatgpt_rows if r.get("krogsveen_mentioned")),
         "chatgpt_total": len(chatgpt_rows),
+        "gemini_mentions": sum(1 for r in gemini_rows if r.get("krogsveen_mentioned")),
+        "gemini_total": len(gemini_rows),
+        "perplexity_mentions": sum(1 for r in perplexity_rows if r.get("krogsveen_mentioned")),
+        "perplexity_cited": sum(1 for r in perplexity_rows if r.get("krogsveen_cited")),
+        "perplexity_total": len(perplexity_rows),
         "avg_position": (
             dashboard_payload["position_trend"][-1]["avg_position"] if dashboard_payload.get("position_trend") else None
         ),
         "cluster_summaries": dashboard_payload.get("cluster_summaries", []),
         "claude_selvsjekk": claude_rows,
         "chatgpt_selvsjekk": chatgpt_rows,
+        "gemini_selvsjekk": gemini_rows,
+        "perplexity_selvsjekk": perplexity_rows,
         "tiltak": dashboard_payload.get("tiltak", []),
         "competitor_benchmark": dashboard_payload.get("competitor_benchmark", []),
     }
@@ -293,7 +302,7 @@ _TEMPLATE = r"""<!doctype html>
   <div class="two-col">
     <div class="card">
       <h2>GEO / AI-synlighet</h2>
-      <div class="card-sub">Claude + ChatGPT-selvsjekk (ekte) vs. Brand Radar (venter på oppsett)</div>
+      <div class="card-sub">Egen selvsjekk mot Claude, ChatGPT, Gemini og Perplexity (ekte data) — erstatter Ahrefs Brand Radar (5 prompts, ingen rotasjon mulig)</div>
       <div id="geo-panel"></div>
     </div>
     <div class="card">
@@ -348,6 +357,12 @@ _TEMPLATE = r"""<!doctype html>
   addChip("Claude-selvsjekk", true);
   if ((data.geo.chatgpt_selvsjekk || []).length) {
     addChip("ChatGPT-selvsjekk", true);
+  }
+  if ((data.geo.gemini_selvsjekk || []).length) {
+    addChip("Gemini-selvsjekk", true);
+  }
+  if ((data.geo.perplexity_selvsjekk || []).length) {
+    addChip("Perplexity-selvsjekk", true);
   }
 
   // ---- Stat tiles ----
@@ -527,7 +542,14 @@ _TEMPLATE = r"""<!doctype html>
     var html = '<div class="geo-item-head"><span class="title">' + title + '</span><span class="status-chip ok">Live data</span></div>';
     rows.forEach(function (r) {
       var mentioned = r.krogsveen_mentioned;
-      var label = mentioned ? "Nevnt" + (r.sentiment ? " · " + r.sentiment : "") : "–";
+      var label = "–";
+      if (mentioned) {
+        label = "Nevnt";
+        if (typeof r.krogsveen_cited !== "undefined") {
+          label += r.krogsveen_cited ? " · sitert" : " · ikke sitert";
+        }
+        if (r.sentiment) { label += " · " + r.sentiment; }
+      }
       html += '<div class="prompt-row"><span class="p">' + r.prompt + '</span><span class="mentioned ' + (mentioned ? "yes" : "no") + '">' + label + '</span></div>';
     });
     item.innerHTML = html;
@@ -536,6 +558,12 @@ _TEMPLATE = r"""<!doctype html>
   renderSelfcheckPanel("Claude-selvsjekk", data.geo.claude_selvsjekk || []);
   if ((data.geo.chatgpt_selvsjekk || []).length) {
     renderSelfcheckPanel("ChatGPT-selvsjekk", data.geo.chatgpt_selvsjekk);
+  }
+  if ((data.geo.gemini_selvsjekk || []).length) {
+    renderSelfcheckPanel("Gemini-selvsjekk", data.geo.gemini_selvsjekk);
+  }
+  if ((data.geo.perplexity_selvsjekk || []).length) {
+    renderSelfcheckPanel("Perplexity-selvsjekk", data.geo.perplexity_selvsjekk);
   }
 
   // ---- Competitor table ----

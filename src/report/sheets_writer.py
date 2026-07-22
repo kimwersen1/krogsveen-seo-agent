@@ -194,6 +194,21 @@ def update_dashboard_sheet(settings: Settings, payload: dict) -> str:
             sentiment = r.get("sentiment") or ""
             rows.append([r["prompt"], "Ja" if r["krogsveen_mentioned"] else "–", sentiment])
 
+    gemini_rows = payload.get("gemini_selvsjekk", [])
+    if gemini_rows:
+        rows += [["", "", ""], ["GEO-prompt (Gemini)", "Nevnt?", "Sentiment"]]
+        for r in gemini_rows:
+            sentiment = r.get("sentiment") or ""
+            rows.append([r["prompt"], "Ja" if r["krogsveen_mentioned"] else "–", sentiment])
+
+    perplexity_rows = payload.get("perplexity_selvsjekk", [])
+    if perplexity_rows:
+        rows += [["", "", ""], ["GEO-prompt (Perplexity)", "Nevnt / Sitert?", "Sentiment"]]
+        for r in perplexity_rows:
+            sentiment = r.get("sentiment") or ""
+            status = "Sitert" if r.get("krogsveen_cited") else ("Nevnt" if r["krogsveen_mentioned"] else "–")
+            rows.append([r["prompt"], status, sentiment])
+
     rows += [["", "", ""], ["Tiltak", "Status", "Uker aktiv"]]
     for t in payload.get("tiltak", []):
         rows.append([t.get("side", ""), t.get("status_vurdering", ""), t.get("uker_aktiv", "")])
