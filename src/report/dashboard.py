@@ -306,22 +306,21 @@ _TEMPLATE = r"""<!doctype html>
   </div>
 
   <div class="card">
+    <h2>Konkurrentbenchmark</h2>
+    <div class="card-sub">Domain Rating og org. trafikk, denne uken</div>
+    <div class="table-scroll"><table id="competitor-table"><thead><tr><th>Domene</th><th>DR</th><th>Org. trafikk/mnd</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="card">
     <h2>Søkeord med AI Overview i SERP</h2>
     <div class="card-sub" id="ai-overview-sub"></div>
     <div id="ai-overview-list"></div>
   </div>
 
-  <div class="two-col">
-    <div class="card">
-      <h2>GEO / AI-synlighet</h2>
-      <div class="card-sub">Egen selvsjekk mot Claude, ChatGPT, Gemini og Perplexity — ekte data, 36 prompts hver</div>
-      <div id="geo-panel"></div>
-    </div>
-    <div class="card">
-      <h2>Konkurrentbenchmark</h2>
-      <div class="card-sub">Domain Rating og org. trafikk, denne uken</div>
-      <div class="table-scroll"><table id="competitor-table"><thead><tr><th>Domene</th><th>DR</th><th>Org. trafikk/mnd</th></tr></thead><tbody></tbody></table></div>
-    </div>
+  <div class="card">
+    <h2>GEO / AI-synlighet</h2>
+    <div class="card-sub">Egen selvsjekk mot Claude, ChatGPT, Gemini og Perplexity — ekte data, 36 prompts hver</div>
+    <div id="geo-panel"></div>
   </div>
 
   <footer>
