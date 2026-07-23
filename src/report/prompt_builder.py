@@ -10,6 +10,14 @@ REPORT_FORMAT = """
    synlige søkeord per cluster) som context der det er relevant, f.eks. hvis et cluster
    har mange usporede søkeord med god posisjon, eller påfallende få totalt — ikke behandle
    det som samme datakilde som cluster_summaries (ingen uke-mot-uke-delta her ennå).
+   Hvert cluster har også ga4_sessions/ga4_key_events (GA4-konverteringer — reelle
+   handlinger som verdivurdering_innsendt, nettvurdering_innsendt eller avtalt møte med
+   megler, landingsside tagget mot samme cluster-regex). Koble dette til
+   posisjonsbevegelsen: et cluster med mange klikk/god posisjon men lav konverteringsrate
+   er et annet slags problem enn et cluster som taper posisjon — trekk fram slike
+   avvik eksplisitt der tallene er tydelige nok (ikke tving det inn hvis datagrunnlaget
+   er for tynt, spesielt clustre med få økter). null/manglende felt betyr at clusteret
+   ikke hadde noen GA4-økter denne uken, ikke at data mangler.
 3. GEO — egen selvsjekk mot fire LLM-er (geo.claude_selvsjekk / chatgpt_selvsjekk /
    gemini_selvsjekk / perplexity_selvsjekk), samme 36 prompts kjørt mot alle. Dette ER
    ekte data, presenter det som det:
