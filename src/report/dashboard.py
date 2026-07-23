@@ -35,7 +35,6 @@ def build_dashboard_payload(
         "gsc_kilde": analysis.get("gsc_kilde", "ingen"),
         "cluster_summaries": analysis.get("cluster_summaries", []),
         "avvik": analysis.get("avvik", [])[:15],
-        "konverteringer": analysis.get("konverteringer", {}),
         "geo": analysis.get("geo", {}),
         "tiltak": analysis.get("tiltak", []),
         "anbefaling": analysis.get("anbefaling", []),
@@ -60,8 +59,6 @@ def build_sheet_payload(dashboard_payload: dict) -> dict:
     site_metrics = dashboard_payload.get("site_metrics") or {}
     domain_rating = dashboard_payload.get("domain_rating") or {}
     all_device = next((r for r in dashboard_payload.get("gsc_site", []) if r.get("device") == "all"), {})
-    konverteringer = dashboard_payload.get("konverteringer", {})
-    konv_totalt = konverteringer.get("totalt") or {}
 
     return {
         "generated": dashboard_payload["generated"],
@@ -89,9 +86,6 @@ def build_sheet_payload(dashboard_payload: dict) -> dict:
             dashboard_payload["position_trend"][-1]["avg_position"] if dashboard_payload.get("position_trend") else None
         ),
         "cluster_summaries": dashboard_payload.get("cluster_summaries", []),
-        "ga4_sessions": konv_totalt.get("sessions"),
-        "ga4_key_events": konv_totalt.get("keyEvents"),
-        "ga4_key_events_breakdown": konverteringer.get("key_events", []),
         "claude_selvsjekk": claude_rows,
         "chatgpt_selvsjekk": chatgpt_rows,
         "gemini_selvsjekk": gemini_rows,
@@ -201,7 +195,7 @@ _TEMPLATE = r"""<!doctype html>
   td { font-variant-numeric: tabular-nums; }
   tr.self td { background: var(--accent-soft); font-weight: 600; }
   .table-scroll { overflow-x: auto; }
-  .cluster-row { display: grid; grid-template-columns: 100px 1fr 60px 150px 120px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .cluster-row { display: grid; grid-template-columns: 100px 1fr 60px 150px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
   .cluster-header { font-size: 11px; color: var(--ink-muted); border-bottom: 1px solid var(--line-strong); padding-bottom: 8px; font-weight: 600; }
   .cluster-row:last-child { border-bottom: none; }
   .cluster-name { font-weight: 600; }
@@ -211,8 +205,6 @@ _TEMPLATE = r"""<!doctype html>
   .cluster-track .seg-flat { background: var(--line-strong); }
   .cluster-count { text-align: right; color: var(--ink-muted); }
   .cluster-delta { text-align: right; font-weight: 600; }
-  .cluster-conversions { text-align: right; color: var(--ink-muted); font-size: 11.5px; }
-  .cluster-conversions strong { color: var(--ink); font-size: 12.5px; font-weight: 600; }
   .cluster-delta.up { color: var(--good); }
   .cluster-delta.down { color: var(--critical); }
   .cluster-delta.flat { color: var(--ink-muted); }
@@ -298,15 +290,8 @@ _TEMPLATE = r"""<!doctype html>
       <span>Fordeling av søkeord i clusteret: <span style="color:var(--good)">■ bedre</span> · <span style="color:var(--critical)">■ dårligere</span> · <span style="color:var(--ink-muted)">■ uendret</span></span>
       <span style="text-align:right">Antall</span>
       <span style="text-align:right">Snittendring</span>
-      <span style="text-align:right">Konverteringer (GA4)</span>
     </div>
     <div id="cluster-rows"></div>
-  </div>
-
-  <div class="card" id="konverteringer-card" style="display:none">
-    <h2>Konverteringer (GA4)</h2>
-    <div class="card-sub" id="konverteringer-sub"></div>
-    <div id="konverteringer-list"></div>
   </div>
 
   <div class="card">
@@ -531,12 +516,7 @@ _TEMPLATE = r"""<!doctype html>
         '<span class="seg-flat" style="flex:' + c.unchanged + '"></span>' +
       '</span>' +
       '<span class="cluster-count">' + c.keyword_count + '</span>' +
-      '<span class="cluster-delta ' + deltaClass + '">' + deltaLabel + '</span>' +
-      '<span class="cluster-conversions">' + (
-        c.ga4_key_events != null
-          ? '<strong>' + c.ga4_key_events + '</strong> / ' + fmt.format(c.ga4_sessions || 0) + ' økter'
-          : '–'
-      ) + '</span>';
+      '<span class="cluster-delta ' + deltaClass + '">' + deltaLabel + '</span>';
     clusterWrap.appendChild(row);
   });
 
@@ -557,39 +537,6 @@ _TEMPLATE = r"""<!doctype html>
   });
   if (!footprintTotal) {
     footprintWrap.innerHTML = '<div class="empty-note">Ingen data denne uken (budsjett-hopp over eller første kjøring)</div>';
-  }
-
-  // ---- Konverteringer (GA4) ----
-  var konv = data.konverteringer || {};
-  var konvTotals = konv.totalt || {};
-  var konvEvents = konv.key_events || [];
-  if (konvEvents.length || konvTotals.sessions) {
-    document.getElementById("konverteringer-card").style.display = "";
-    var sessions = konvTotals.sessions || 0;
-    var totalKeyEvents = konvTotals.keyEvents || 0;
-    // En samlet rate (key events / ALLE økter på siten) er lite meningsfull — de fleste
-    // økter lander på boliglisting-sider, forsiden e.l. som aldri var ment å konvertere på
-    // disse konkrete målene. Vis i stedet raten for økter som faktisk landet i et
-    // SEO/GEO-cluster (se cluster-tabellen), som er det tallet som faktisk sier noe.
-    var taggedSessions = (data.cluster_summaries || []).reduce(function (s, c) { return s + (c.ga4_sessions || 0); }, 0);
-    var taggedEvents = (data.cluster_summaries || []).reduce(function (s, c) { return s + (c.ga4_key_events || 0); }, 0);
-    var taggedRate = taggedSessions ? ((taggedEvents / taggedSessions) * 100).toFixed(2) : null;
-    document.getElementById("konverteringer-sub").textContent =
-      fmt.format(totalKeyEvents) + " key events denne uken, fra " + fmt.format(sessions) + " økter på hele siten. " +
-      (taggedRate != null
-        ? "Blant de " + fmt.format(taggedSessions) + " øktene som landet i et SEO/GEO-cluster: " + taggedRate + " % konverteringsrate — se cluster-tabellen over for fordeling. "
-        : "Se cluster-tabellen over for fordeling. ") +
-      "En samlet rate mot alle økter (inkl. boliglisting-sider, forsiden osv.) ville vært misvisende lav.";
-    var konvWrap = document.getElementById("konverteringer-list");
-    konvEvents.forEach(function (e) {
-      var row = document.createElement("div");
-      row.className = "footprint-row";
-      row.innerHTML =
-        '<span class="name">' + e.eventName + '</span>' +
-        '<span class="count">' + fmt.format(e.eventCount) + '</span>' +
-        '<span class="pos"></span>';
-      konvWrap.appendChild(row);
-    });
   }
 
   // ---- GEO panel ----

@@ -151,19 +151,11 @@ def update_dashboard_sheet(settings: Settings, payload: dict) -> str:
         ["GSC-klikk (uke)", payload.get("gsc_clicks"), ""],
         ["AI Overview-søkeord", payload.get("ai_overview_count"), ""],
         ["Claude nevner Krogsveen", f"{payload.get('claude_mentions')} / {payload.get('claude_total')}", ""],
-        ["GA4 key events (uke)", payload.get("ga4_key_events"), f"av {payload.get('ga4_sessions')} økter" if payload.get("ga4_sessions") else ""],
-        ["", "", "", ""],
-        ["Cluster", "Antall", "Snittendring (plasser bedre; negativt = dårligere)", "Konverteringer (GA4)"],
+        ["", "", ""],
+        ["Cluster", "Antall", "Snittendring (plasser bedre; negativt = dårligere)"],
     ]
     for c in payload.get("cluster_summaries", []):
-        conv = f"{c['ga4_key_events']} / {c['ga4_sessions']} økter" if c.get("ga4_key_events") is not None else ""
-        rows.append([c["name"], c["keyword_count"], round(c["avg_position_delta"], 2), conv])
-
-    ga4_breakdown = payload.get("ga4_key_events_breakdown", [])
-    if ga4_breakdown:
-        rows += [["", "", ""], ["GA4 key event", "Antall", ""]]
-        for e in ga4_breakdown:
-            rows.append([e.get("eventName"), e.get("eventCount"), ""])
+        rows.append([c["name"], c["keyword_count"], round(c["avg_position_delta"], 2)])
 
     footprint_cluster = payload.get("organisk_fotavtrykk_cluster", [])
     if footprint_cluster:
@@ -226,10 +218,7 @@ def update_dashboard_sheet(settings: Settings, payload: dict) -> str:
         rows.append([c["domain"], c.get("domain_rating"), c.get("org_traffic")])
 
     # Tøm gammelt innhold først (mer rader forrige uke enn denne ville ellers bli liggende igjen)
-    # D-kolonnen lagt til for GA4-konverteringer per cluster (22.07.2026) — clear-rangen må
-    # dekke den, ellers kan gamle D-verdier bli stående igjen fra en tidligere kjøring med
-    # flere rader enn den nye.
-    sheets_api.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range="Dashboard!A1:D500").execute()
+    sheets_api.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range="Dashboard!A1:C500").execute()
     sheets_api.spreadsheets().values().update(
         spreadsheetId=spreadsheet_id, range="Dashboard!A1", valueInputOption="RAW", body=_values(rows)
     ).execute()
