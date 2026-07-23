@@ -567,10 +567,19 @@ _TEMPLATE = r"""<!doctype html>
     document.getElementById("konverteringer-card").style.display = "";
     var sessions = konvTotals.sessions || 0;
     var totalKeyEvents = konvTotals.keyEvents || 0;
-    var rate = sessions ? ((totalKeyEvents / sessions) * 100).toFixed(2) : "0.00";
+    // En samlet rate (key events / ALLE økter på siten) er lite meningsfull — de fleste
+    // økter lander på boliglisting-sider, forsiden e.l. som aldri var ment å konvertere på
+    // disse konkrete målene. Vis i stedet raten for økter som faktisk landet i et
+    // SEO/GEO-cluster (se cluster-tabellen), som er det tallet som faktisk sier noe.
+    var taggedSessions = (data.cluster_summaries || []).reduce(function (s, c) { return s + (c.ga4_sessions || 0); }, 0);
+    var taggedEvents = (data.cluster_summaries || []).reduce(function (s, c) { return s + (c.ga4_key_events || 0); }, 0);
+    var taggedRate = taggedSessions ? ((taggedEvents / taggedSessions) * 100).toFixed(2) : null;
     document.getElementById("konverteringer-sub").textContent =
-      fmt.format(totalKeyEvents) + " key events fra " + fmt.format(sessions) + " økter denne uken (" + rate + " % konverteringsrate). " +
-      "Se cluster-tabellen over for fordeling per cluster.";
+      fmt.format(totalKeyEvents) + " key events denne uken, fra " + fmt.format(sessions) + " økter på hele siten. " +
+      (taggedRate != null
+        ? "Blant de " + fmt.format(taggedSessions) + " øktene som landet i et SEO/GEO-cluster: " + taggedRate + " % konverteringsrate — se cluster-tabellen over for fordeling. "
+        : "Se cluster-tabellen over for fordeling. ") +
+      "En samlet rate mot alle økter (inkl. boliglisting-sider, forsiden osv.) ville vært misvisende lav.";
     var konvWrap = document.getElementById("konverteringer-list");
     konvEvents.forEach(function (e) {
       var row = document.createElement("div");
