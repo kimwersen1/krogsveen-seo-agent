@@ -208,6 +208,26 @@ def get_gsc_performance_by_device(settings: Settings, date_from: str, date_to: s
     return data.get("metrics", [])
 
 
+def get_question_keywords(settings: Settings, seed: str, country: str = "no", limit: int = 15) -> list[str]:
+    """keywords-explorer/matching-terms med terms=questions — ekte spørsmål folk faktisk
+    søker på rundt et emne (Ahrefs sin "Questions"-rapport), ikke gjettede prompts.
+    Brukes til å seede GEO-selvsjekk-prompts fra reelle søketermer per cluster, se
+    scripts/geo_citation_audit.py. select=keyword uten volum/vanskelighetsgrad holder
+    kostnaden nede (kun keyword-feltet har ingen enhets-kostnad i dette endepunktet)."""
+    params = {
+        "select": "keyword",
+        "keywords": seed,
+        "country": country,
+        "terms": "questions",
+        "limit": limit,
+        "output": "json",
+    }
+    data = _get(settings, "keywords-explorer/matching-terms", params)
+    keywords = [row["keyword"] for row in data.get("keywords", [])]
+    logger.info("Ahrefs questions for %r: %d treff", seed, len(keywords))
+    return keywords
+
+
 def get_organic_keywords(
     settings: Settings,
     target: str,

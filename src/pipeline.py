@@ -13,7 +13,7 @@ from src.analysis import clusters as cluster_analysis
 from src.analysis import diffs as diff_analysis
 from src.analysis import geo as geo_analysis
 from src.analysis import tiltak as tiltak_analysis
-from src.collectors import ahrefs, chatgpt_geo, claude_geo, gemini_geo, gsc, gsc_oauth, perplexity_geo, storage
+from src.collectors import ahrefs, chatgpt_geo, claude_geo, ga4_oauth, gemini_geo, gsc, gsc_oauth, perplexity_geo, storage
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
 from src.report.generate import extract_recommendations, generate_report
@@ -220,6 +220,49 @@ def run_pipeline(
         elif not settings.perplexity_api_key:
             data_gaps.append("Perplexity-selvsjekk hoppet over — PERPLEXITY_API_KEY er ikke satt i .env.")
 
+    # GA4 — kobler faktiske konverteringer (key events: verdivurdering_innsendt,
+    # nettvurdering_innsendt, avtalt møte med megler) til cluster-arbeidet, ikke bare
+    # synlighet. Samme OAuth-token som GSC, utvidet med analytics.readonly-scope (se
+    # src/collectors/ga4_oauth.py og scripts/gsc_auth_setup.py).
+    ga4_key_events, ga4_totals, ga4_cluster_conversions, ga4_trend = [], {}, [], []
+    if settings.ga4_configured:
+        try:
+            ga4_key_events = ga4_oauth.get_key_events_by_name(
+                settings, windows["week_start"].isoformat(), windows["week_end"].isoformat()
+            )
+            ga4_totals = ga4_oauth.get_site_totals(
+                settings, windows["week_start"].isoformat(), windows["week_end"].isoformat()
+            )
+            ga4_landing_pages = ga4_oauth.get_conversions_by_landing_page(
+                settings, windows["week_start"].isoformat(), windows["week_end"].isoformat()
+            )
+        except HttpError as exc:
+            data_gaps.append(
+                f"GA4-henting feilet denne uken ({exc}). Sjekk at Google Analytics Data API er "
+                "aktivert og at OAuth-tokenet har analytics.readonly-scope."
+            )
+        else:
+            if ga4_key_events:
+                storage.save_ga4_conversions_rows(conn, week_start_label, ga4_key_events)
+            for name in settings.clusters.keys():
+                rows = [
+                    r for r in ga4_landing_pages
+                    if name in cluster_analysis.tag_keyword(r.get("landingPage", ""), settings.clusters)
+                ]
+                if rows:
+                    ga4_cluster_conversions.append(
+                        {
+                            "name": name,
+                            "sessions": sum(r.get("sessions", 0) for r in rows),
+                            "key_events": sum(r.get("keyEvents", 0) for r in rows),
+                        }
+                    )
+    else:
+        data_gaps.append(
+            "GA4-konverteringsdata ikke tilgjengelig — GOOGLE_ANALYTICS_PROPERTY_ID/OAuth-scope er ikke konfigurert."
+        )
+    ga4_trend = storage.get_ga4_conversions_trend(conn, weeks=12)
+
     tagged_desktop = cluster_analysis.tag_rows(rank_desktop, settings.clusters)
     cluster_summaries = diff_analysis.summarize_all_clusters(tagged_desktop, list(settings.clusters.keys()))
     anomalies = diff_analysis.detect_anomalies(
@@ -249,6 +292,13 @@ def run_pipeline(
 
     conn.close()
 
+    cluster_summaries_dicts = [vars(c) for c in cluster_summaries]
+    ga4_conv_by_name = {c["name"]: c for c in ga4_cluster_conversions}
+    for cs in cluster_summaries_dicts:
+        conv = ga4_conv_by_name.get(cs["name"])
+        cs["ga4_sessions"] = conv["sessions"] if conv else None
+        cs["ga4_key_events"] = conv["key_events"] if conv else None
+
     analysis = {
         "uke": today.isocalendar()[1],
         "ar": today.year,
@@ -257,8 +307,13 @@ def run_pipeline(
         "site_metrics": site_metrics,
         "gsc_site": gsc_site_rows,
         "gsc_kilde": gsc_source,
-        "cluster_summaries": [vars(c) for c in cluster_summaries],
+        "cluster_summaries": cluster_summaries_dicts,
         "avvik": anomalies,
+        "konverteringer": {
+            "totalt": ga4_totals,
+            "key_events": ga4_key_events,
+            "trend": ga4_trend,
+        },
         "organisk_fotavtrykk": {
             "total_sokeord": len(footprint_rows),
             "cluster_summary": footprint_cluster_summary,
