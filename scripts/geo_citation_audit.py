@@ -42,13 +42,27 @@ logger = logging.getLogger(__name__)
 
 TARGET_DOMAIN = "krogsveen.no"
 OUTPUT_PATH = Path(__file__).resolve().parent.parent / "data" / "geo_citation_audit.csv"
-CSV_FIELDS = ["timestamp", "engine", "prompt_type", "prompt", "cited", "matched_urls", "all_citations"]
+CSV_FIELDS = ["timestamp", "engine", "prompt_type", "cluster", "prompt", "cited", "matched_urls", "all_citations"]
+
+# Ett rent søkeord per cluster (ikke hele regexen fra clusters.json) som seed for Ahrefs
+# sin "Questions"-rapport — reelle spørsmål folk søker på, ikke gjettede prompts.
+# merkevare (=krogsveen selv) og lokal_megler (dekkes allerede av de eksisterende
+# by-spesifikke "anbefal eiendomsmegler i X"-promptene) er bevisst utelatt.
+CLUSTER_SEEDS = {
+    "boligverdi": "boligverdi",
+    "boligpriser": "boligpriser",
+    "finansiering": "boliglån",
+    "forsikring": "boligforsikring",
+    "solgte_boliger": "solgte boliger",
+    "kjop": "kjøpe bolig",
+}
 
 
 @dataclass
 class TypedPrompt:
     prompt: str
     type: str  # branded | unbranded-category | comparison | local | buyer-stage
+    cluster: str | None = None  # SEO-cluster fra clusters.json, hvis promptet er seedet derfra
 
 
 # Retagget fra config.json sine eksisterende 36 geo_prompts (alle var allerede
@@ -150,6 +164,30 @@ def seed_prompts_from_gsc(settings, n: int = 8) -> list[TypedPrompt]:
         if len(seeded) >= n:
             break
     logger.info("Seedet %d ekstra unbranded-category-prompts fra GSC-søketermer", len(seeded))
+    return seeded
+
+
+def seed_prompts_from_ahrefs_questions(settings, n_per_cluster: int = 4) -> list[TypedPrompt]:
+    """Henter ekte spørsmål folk søker på (Ahrefs sin "Questions"-rapport) per
+    SEO-cluster, i stedet for gjettede prompts — se CLUSTER_SEEDS. Knytter GEO-synlighet
+    direkte til samme cluster-inndeling som resten av rapporten bruker, slik at man kan
+    si "krogsveen siteres på boligverdi-spørsmål men ikke boligpriser-spørsmål" i stedet
+    for kun ett samlet tall. Feiler stille per cluster (ikke hele scriptet) hvis Ahrefs
+    er utilgjengelig eller over budsjett."""
+    from src.collectors import ahrefs
+
+    seeded: list[TypedPrompt] = []
+    for cluster, seed in CLUSTER_SEEDS.items():
+        try:
+            questions = ahrefs.get_question_keywords(settings, seed, limit=n_per_cluster)
+        except ahrefs.AhrefsError as exc:
+            logger.warning("Ahrefs questions for cluster %r feilet: %s", cluster, exc)
+            continue
+        for q in questions:
+            if "krogsveen" in q.lower():
+                continue
+            seeded.append(TypedPrompt(q, "unbranded-category", cluster=cluster))
+    logger.info("Seedet %d prompts fra Ahrefs' Questions-rapport på tvers av %d clustre", len(seeded), len(CLUSTER_SEEDS))
     return seeded
 
 
@@ -266,6 +304,7 @@ def run_audit(settings, prompts: list[TypedPrompt], engine_names: list[str]) -> 
                     "timestamp": timestamp,
                     "engine": engine_name,
                     "prompt_type": tp.type,
+                    "cluster": tp.cluster or "",
                     "prompt": tp.prompt,
                     "cited": bool(matched),
                     "matched_urls": "; ".join(matched),
@@ -304,6 +343,9 @@ def main() -> None:
         help="Kommaseparert liste over motorer å kjøre (default: alle)",
     )
     parser.add_argument("--no-gsc-seed", action="store_true", help="Ikke hent ekstra prompts fra GSC-søketermer")
+    parser.add_argument(
+        "--no-ahrefs-seed", action="store_true", help="Ikke hent ekte spørsmål fra Ahrefs' Questions-rapport per cluster"
+    )
     args = parser.parse_args()
 
     from src.settings import load_settings
@@ -313,6 +355,8 @@ def main() -> None:
     prompts = list(BASE_PROMPTS)
     if not args.no_gsc_seed:
         prompts += seed_prompts_from_gsc(settings)
+    if not args.no_ahrefs_seed:
+        prompts += seed_prompts_from_ahrefs_questions(settings)
     if args.limit:
         prompts = prompts[: args.limit]
 
@@ -328,7 +372,18 @@ def main() -> None:
     total = len(rows)
     cited = sum(1 for r in rows if r["cited"])
     print(f"\n{cited} / {total} prompt-motor-kombinasjoner siterte {TARGET_DOMAIN}")
-    print(f"Resultater lagt til: {OUTPUT_PATH}")
+
+    by_cluster: dict[str, list[dict]] = {}
+    for r in rows:
+        if r["cluster"]:
+            by_cluster.setdefault(r["cluster"], []).append(r)
+    if by_cluster:
+        print("\nPer cluster (fra Ahrefs' Questions-rapport):")
+        for cluster, cluster_rows in sorted(by_cluster.items()):
+            c = sum(1 for r in cluster_rows if r["cited"])
+            print(f"  {cluster}: {c} / {len(cluster_rows)}")
+
+    print(f"\nResultater lagt til: {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
