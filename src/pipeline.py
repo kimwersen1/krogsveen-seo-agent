@@ -107,39 +107,21 @@ def run_pipeline(
         # (with_metrics=False, ~2 enheter/rad) bredde-kartlegging, se ahrefs.py for detaljer.
         footprint_rows = ahrefs.get_organic_keywords_paginated(settings, "krogsveen.no", windows["ahrefs_date"].isoformat())
 
-    # GSC-data hos Ahrefs kan ha noen dagers etterslep fra Google — spør om et vindu
-    # som slutter noen dager tilbake i tid i stedet for i går, og degrader til en
-    # notert datamangel (ikke krasj) hvis selv det mangler denne uken.
+    # GSC-data kan ha noen dagers etterslep fra Google — spør om et vindu som slutter
+    # noen dager tilbake i tid i stedet for i går.
     gsc_available_end = min(windows["week_end"], today - timedelta(days=3))
-    try:
-        gsc_site_history = ahrefs.get_gsc_performance_history(
-            settings, windows["prev_week_start"].isoformat(), gsc_available_end.isoformat()
-        )
-        gsc_site_by_device = ahrefs.get_gsc_performance_by_device(
-            settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
-        )
-    except ahrefs.AhrefsError as e:
-        logger.warning("GSC-data (via Ahrefs) ikke tilgjengelig denne uken: %s", e)
-        data_gaps.append("GSC-data (via Ahrefs) var ikke tilgjengelig for perioden denne uken — trolig etterslep hos Google/Ahrefs.")
-        gsc_site_history, gsc_site_by_device = [], []
-    gsc_site_rows = list(gsc_site_by_device)
-    if gsc_site_history:
-        latest = gsc_site_history[-1]
-        gsc_site_rows.append(
-            {
-                "device": "all",
-                "clicks": latest.get("clicks"),
-                "impressions": latest.get("impressions"),
-                "ctr": latest.get("ctr"),
-                "position": latest.get("position"),
-            }
-        )
 
     gsc_source = "ingen"
+    gsc_site_rows: list[dict] = []
     if settings.gsc_oauth_configured:
         # Direkte tilgang via brukerens egen Google-konto — se src/collectors/gsc_oauth.py
-        # for hvorfor dette virker uten admin-tilgang. Samme etterslep-justerte sluttdato
-        # som Ahrefs-hentingen over, siden Google-siden av GSC har lignende forsinkelse.
+        # for hvorfor dette virker uten admin-tilgang. Dekker nå også site-wide-tallene
+        # (gsc_site_rows), ikke bare per-søkeord/per-side — Ahrefs sin egen, separate
+        # GSC-integrasjon (tidligere eneste kilde for site-wide-tallene) hadde
+        # etterslep-problemer uavhengig av at OAuth-tilkoblingen fungerte fint
+        # (28.07.2026: "GSC-data via Ahrefs ikke tilgjengelig" samme uke som OAuth-dataen
+        # under fungerte helt fint) — ingen grunn til en ekstra, mindre pålitelig
+        # mellomting når den direkte kilden allerede er konfigurert.
         try:
             gsc_query_rows = gsc_oauth.get_query_performance(
                 settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
@@ -147,10 +129,13 @@ def run_pipeline(
             gsc_page_rows = gsc_oauth.get_page_performance(
                 settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
             )
+            gsc_site_rows = gsc_oauth.get_site_performance(
+                settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
+            )
             gsc_source = "oauth"
         except HttpError as e:
             logger.warning("GSC OAuth-henting feilet denne uken: %s", e)
-            data_gaps.append(f"GSC OAuth-henting feilet denne uken ({e}) — klikk/CTR per søkeord mangler.")
+            data_gaps.append(f"GSC OAuth-henting feilet denne uken ({e}) — klikk/CTR per søkeord og site-wide-tall mangler.")
             gsc_query_rows, gsc_page_rows = [], []
     elif gsc_query_export or gsc_page_export:
         gsc_query_rows = gsc.import_gsc_export(gsc_query_export, "query") if gsc_query_export else []
@@ -163,6 +148,34 @@ def run_pipeline(
             "Se scripts/gsc_auth_setup.py (automatisk, anbefalt) eller scripts/run_weekly.py --gsc-query-export (manuelt)."
         )
     gsc_by_keyword = _gsc_by_keyword_from_export(gsc_query_rows)
+
+    if not gsc_site_rows:
+        # Reserveløsning for site-wide-tallene: Ahrefs sin egen GSC-integrasjon, brukt
+        # kun når OAuth ikke er konfigurert/feilet, eller ved CSV-import (som ikke har
+        # noen site-wide-ekvivalent).
+        try:
+            gsc_site_history = ahrefs.get_gsc_performance_history(
+                settings, windows["prev_week_start"].isoformat(), gsc_available_end.isoformat()
+            )
+            gsc_site_by_device = ahrefs.get_gsc_performance_by_device(
+                settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
+            )
+        except ahrefs.AhrefsError as e:
+            logger.warning("GSC-data (via Ahrefs) ikke tilgjengelig denne uken: %s", e)
+            data_gaps.append("GSC-data (via Ahrefs) var ikke tilgjengelig for perioden denne uken — trolig etterslep hos Google/Ahrefs.")
+            gsc_site_history, gsc_site_by_device = [], []
+        gsc_site_rows = list(gsc_site_by_device)
+        if gsc_site_history:
+            latest = gsc_site_history[-1]
+            gsc_site_rows.append(
+                {
+                    "device": "all",
+                    "clicks": latest.get("clicks"),
+                    "impressions": latest.get("impressions"),
+                    "ctr": latest.get("ctr"),
+                    "position": latest.get("position"),
+                }
+            )
 
     conn = storage.get_connection()
     storage.save_rank_tracker_rows(conn, week_start_label, "desktop", rank_desktop)

@@ -77,3 +77,33 @@ def get_query_performance(settings: Settings, date_from: str, date_to: str, row_
 def get_page_performance(settings: Settings, date_from: str, date_to: str, row_limit: int = 1000) -> list[dict]:
     """Klikk/CTR/posisjon per side — direkte erstatning for gsc.import_gsc_export(dimension='page')."""
     return _query(settings, date_from, date_to, "page", row_limit)
+
+
+def get_site_performance(settings: Settings, date_from: str, date_to: str) -> list[dict]:
+    """Site-wide klikk/visninger/CTR/posisjon per enhetstype PLUSS en samlet "all"-rad —
+    direkte via brukerens egen GSC-tilgang, samme datakilde som get_query_performance/
+    get_page_performance over. Erstatter ahrefs.get_gsc_performance_by_device +
+    get_gsc_performance_history (Ahrefs sin egen, separate GSC-integrasjon), som viste
+    seg å ha etterslep-problemer uavhengig av at OAuth-tilkoblingen fungerte fint
+    (28.07.2026) — ingen grunn til å gå via en ekstra, mindre pålitelig mellomting når
+    den direkte kilden allerede er konfigurert."""
+    creds = _credentials(settings)
+    service = build("webmasters", "v3", credentials=creds, cache_discovery=False)
+
+    device_rows = _query(settings, date_from, date_to, "device", row_limit=10)
+    for row in device_rows:
+        row["device"] = row.pop("device").lower()
+
+    # Ingen dimensjoner gitt = én samlet rad for hele perioden, uten oppdeling.
+    body = {"startDate": date_from, "endDate": date_to, "rowLimit": 1}
+    response = service.searchanalytics().query(siteUrl=settings.google_search_console_property, body=body).execute()
+    rows = response.get("rows", [])
+    all_row = {
+        "device": "all",
+        "clicks": int(rows[0].get("clicks", 0)) if rows else 0,
+        "impressions": int(rows[0].get("impressions", 0)) if rows else 0,
+        "ctr": round(rows[0].get("ctr", 0.0) * 100, 4) if rows else 0.0,
+        "position": round(rows[0].get("position", 0.0), 4) if rows else 0.0,
+    }
+    logger.info("GSC OAuth: site-wide (%s -> %s), %d enhetsrader + samlet-rad", date_from, date_to, len(device_rows))
+    return device_rows + [all_row]
