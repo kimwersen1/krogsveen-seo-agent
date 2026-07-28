@@ -5,6 +5,7 @@ import logging
 from datetime import date, timedelta
 from pathlib import Path
 
+import anthropic
 import openai
 from google.genai.errors import APIError as GeminiAPIError
 from googleapiclient.errors import HttpError
@@ -179,8 +180,20 @@ def run_pipeline(
     if gsc_page_rows:
         storage.save_gsc_rows(conn, week_start_label, "page", gsc_page_rows)
 
-    geo_selfcheck = claude_geo.check_geo_visibility(settings)
-    storage.save_geo_selfcheck_rows(conn, week_start_label, geo_selfcheck, source="claude")
+    # Samme robusthetsmønster som ChatGPT/Gemini/Perplexity under — en Claude-selvsjekk-
+    # feil (f.eks. tom kredittsaldo, se 27.07.2026-hendelsen) skal degradere til et
+    # notert datahull, ikke velte HELE ukesrapporten. Rapportgenereringen lenger ned
+    # bruker også Claude og vil fortsatt feile hardt hvis kontoen fortsatt er uten
+    # kreditt da — det er forventet og riktig (ingen rapporttekst uten Claude), men denne
+    # selvsjekken alene skal ikke være det som stopper alt tidlig i kjøringen.
+    try:
+        geo_selfcheck = claude_geo.check_geo_visibility(settings)
+    except anthropic.APIError as exc:
+        geo_selfcheck = []
+        data_gaps.append(f"Claude-selvsjekk feilet ({exc}). Sjekk API-nøkkel/fakturering på console.anthropic.com.")
+    else:
+        if geo_selfcheck:
+            storage.save_geo_selfcheck_rows(conn, week_start_label, geo_selfcheck, source="claude")
 
     try:
         chatgpt_selfcheck = chatgpt_geo.check_geo_visibility(settings)
