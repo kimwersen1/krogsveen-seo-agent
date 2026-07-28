@@ -63,6 +63,13 @@ CREATE TABLE IF NOT EXISTS organic_footprint_weekly (
     PRIMARY KEY (week_start, keyword)
 );
 
+CREATE TABLE IF NOT EXISTS ga4_conversions_weekly (
+    week_start TEXT NOT NULL,
+    event_name TEXT NOT NULL,
+    count INTEGER,
+    PRIMARY KEY (week_start, event_name)
+);
+
 CREATE TABLE IF NOT EXISTS content_briefs_meta (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     url TEXT NOT NULL,
@@ -239,6 +246,30 @@ def get_organic_footprint_trend(conn: sqlite3.Connection, weeks: int = 12) -> li
         (weeks,),
     )
     rows = [{"week_start": w, "keyword_count": n, "avg_position": round(p, 2)} for w, n, p in cur.fetchall()]
+    return list(reversed(rows))
+
+
+def save_ga4_conversions_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict]) -> None:
+    """rows: output fra ga4_oauth.get_key_events_by_name ([{eventName, eventCount}])."""
+    conn.executemany(
+        """INSERT OR REPLACE INTO ga4_conversions_weekly (week_start, event_name, count)
+           VALUES (?, ?, ?)""",
+        [(week_start, r.get("eventName"), r.get("eventCount")) for r in rows],
+    )
+    conn.commit()
+
+
+def get_ga4_conversions_trend(conn: sqlite3.Connection, weeks: int = 12) -> list[dict]:
+    """Sum av alle key events per uke — trend for total konverteringsvolum over tid."""
+    cur = conn.execute(
+        """SELECT week_start, SUM(count) as total
+           FROM ga4_conversions_weekly
+           GROUP BY week_start
+           ORDER BY week_start DESC
+           LIMIT ?""",
+        (weeks,),
+    )
+    rows = [{"week_start": w, "key_events": int(total or 0)} for w, total in cur.fetchall()]
     return list(reversed(rows))
 
 

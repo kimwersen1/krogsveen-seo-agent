@@ -52,6 +52,7 @@ class Settings:
     google_oauth_client_secret: str
     google_oauth_refresh_token: str
     google_search_console_property: str
+    google_analytics_property_id: str
     gemini_api_key: str
     gemini_model: str
     perplexity_api_key: str
@@ -80,6 +81,13 @@ class Settings:
     def gsc_oauth_configured(self) -> bool:
         return bool(self.google_oauth_client_id and self.google_oauth_client_secret and self.google_oauth_refresh_token)
 
+    @property
+    def ga4_configured(self) -> bool:
+        # Samme OAuth-klient/refresh-token som GSC (se src/collectors/ga4_oauth.py) —
+        # krever i tillegg at refresh-tokenet faktisk har analytics.readonly-scope
+        # (regenerert via scripts/gsc_auth_setup.py), ikke bare property-ID-en satt.
+        return self.gsc_oauth_configured and bool(self.google_analytics_property_id)
+
 
 def load_settings() -> Settings:
     return Settings(
@@ -104,6 +112,9 @@ def load_settings() -> Settings:
         google_oauth_client_secret=_optional("GOOGLE_OAUTH_CLIENT_SECRET"),
         google_oauth_refresh_token=_optional("GOOGLE_OAUTH_REFRESH_TOKEN"),
         google_search_console_property=_optional("GOOGLE_SEARCH_CONSOLE_PROPERTY", "sc-domain:krogsveen.no"),
+        # Valgfritt — GA4 Data API, samme OAuth-refresh-token som GSC over (utvidet med
+        # analytics.readonly-scope). Se src/collectors/ga4_oauth.py.
+        google_analytics_property_id=_optional("GOOGLE_ANALYTICS_PROPERTY_ID"),
         # Valgfrie — del av erstatningen for Ahrefs Brand Radar (21.07.2026), samme
         # mønster som ChatGPT-selvsjekken: hopper stille over seg selv uten nøkkel.
         gemini_api_key=_optional("GEMINI_API_KEY"),
