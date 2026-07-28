@@ -202,7 +202,9 @@ def get_citations_claude(settings, prompt: str) -> list[str]:
         model=settings.anthropic_model,
         max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
-        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
+        # max_uses=3 (ned fra 5) — web-søk koster $10/1000 søk i tillegg til vanlige
+        # token-kostnader; 5 var unødvendig sjenerøst for en enkel spørring.
+        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
     )
     urls = []
     for block in response.content:
@@ -346,6 +348,9 @@ def main() -> None:
     parser.add_argument(
         "--no-ahrefs-seed", action="store_true", help="Ikke hent ekte spørsmål fra Ahrefs' Questions-rapport per cluster"
     )
+    parser.add_argument(
+        "--yes", action="store_true", help="Hopp over kostnads-bekreftelsen (for ikke-interaktiv/CI-bruk)"
+    )
     args = parser.parse_args()
 
     from src.settings import load_settings
@@ -364,6 +369,20 @@ def main() -> None:
     unknown = set(engine_names) - set(ENGINES)
     if unknown:
         raise SystemExit(f"Ukjent(e) motor(er): {unknown}. Gyldige: {list(ENGINES)}")
+
+    n_calls = len(prompts) * len(engine_names)
+    n_claude_calls = len(prompts) if "claude" in engine_names else 0
+    # Grov kostnadsestimat — web-søk koster $10/1000 søk (Claude/OpenAI) i tillegg til
+    # vanlige token-kostnader. Faktisk antall søk per prompt varierer (modellen velger
+    # selv om/hvor mange ganger den søker), så dette er et øvre anslag, ikke eksakt.
+    est_usd = round(n_claude_calls * 3 * 0.01, 2)  # opptil max_uses=3 søk per Claude-kall
+    print(f"\nOm å kjøre {len(prompts)} prompts × {len(engine_names)} motorer = {n_calls} API-kall.")
+    print(f"Grovt kostnadsanslag for web-søk alene: opptil ~${est_usd} (Claude, øvre grense — kommer i tillegg til vanlige token-kostnader på alle motorer).")
+    if not args.yes:
+        svar = input("Fortsette? [y/N] ").strip().lower()
+        if svar not in ("y", "yes", "j", "ja"):
+            print("Avbrutt.")
+            return
 
     logger.info("Kjører %d prompts mot %d motorer (%s)", len(prompts), len(engine_names), ", ".join(engine_names))
     rows = run_audit(settings, prompts, engine_names)
