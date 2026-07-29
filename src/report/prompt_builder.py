@@ -26,6 +26,16 @@ REPORT_FORMAT = """
       nevnes hos Claude/Gemini men ikke ChatGPT/Perplexity) — det er ofte mer informativt
       enn gjennomsnittet.
    c) Søkeord med ai_overview i SERP (fra Ahrefs rank tracker).
+   d) geo.ga4_ai_referral: faktisk trafikk fra AI-chatter (chatgpt.com, claude.ai,
+      gemini.google.com, perplexity, copilot.com) som har klikket seg inn på krogsveen.no,
+      med økter/engasjement/konverteringer per kilde. Dette er selvsjekkens motstykke —
+      ikke "blir vi nevnt i et testspørsmål", men "kommer det faktiske mennesker herfra".
+      Behandle lav trafikk her ikke som en feil, men som en tidlig-fase-status. En tom
+      liste betyr at GA4 ikke er konfigurert, ikke at det ikke er noe AI-trafikk.
+      VIKTIG: dette er IKKE ukens tall som resten av rapporten — geo.ga4_ai_referral_periode_dager
+      (alltid 28) forteller hvor mange dager tallene faktisk dekker. Omtal det eksplisitt
+      som "siste 28 dager" (eller tilsvarende), aldri som "denne uken" — lavvolum-tallene
+      her blir ustabile/misvisende over en enkelt uke, derfor det lengre vinduet.
 4. Tiltaks-effekt.
 5. Avvik (>3 pos / >20 % klikk).
 6. Anbefaling for kommende uke (2–3 punkter).

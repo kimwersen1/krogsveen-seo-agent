@@ -323,6 +323,12 @@ _TEMPLATE = r"""<!doctype html>
     <div id="geo-panel"></div>
   </div>
 
+  <div class="card" id="ga4-card" style="display:none">
+    <h2>AI-referral-trafikk <span id="ga4-period-badge" class="card-sub" style="font-weight:normal"></span></h2>
+    <div class="card-sub">Faktiske økter fra AI-chatter (GA4) — selvsjekken over viser om Krogsveen nevnes, dette viser om noen faktisk klikker seg inn. Lavvolum-tall, derfor et lengre vindu enn resten av siden (som viser denne uken).</div>
+    <div class="table-scroll"><table id="ga4-table"><thead><tr><th>Kilde</th><th>Økter</th><th>Engasjement</th><th>Konverteringer</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
   <footer>
     <span id="footer-source"></span>
     <span class="gap-note" id="footer-gaps"></span>
@@ -570,6 +576,24 @@ _TEMPLATE = r"""<!doctype html>
   }
   if ((data.geo.perplexity_selvsjekk || []).length) {
     renderSelfcheckPanel("Perplexity-selvsjekk", data.geo.perplexity_selvsjekk);
+  }
+
+  // ---- GA4 AI-referral-tabell ----
+  var ga4Rows = data.geo.ga4_ai_referral || [];
+  if (ga4Rows.length) {
+    document.getElementById("ga4-card").style.display = "";
+    var ga4Days = data.geo.ga4_ai_referral_periode_dager;
+    document.getElementById("ga4-period-badge").textContent = ga4Days ? "(siste " + ga4Days + " dager)" : "";
+    var ga4Body = document.querySelector("#ga4-table tbody");
+    ga4Rows.forEach(function (r) {
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td class="mono">' + r.source + '</td>' +
+        '<td>' + fmt.format(r.sessions || 0) + '</td>' +
+        '<td>' + (r.engagement_rate != null ? r.engagement_rate + "%" : "–") + '</td>' +
+        '<td>' + (r.conversions || 0) + '</td>';
+      ga4Body.appendChild(tr);
+    });
   }
 
   // ---- Competitor table ----

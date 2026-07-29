@@ -14,7 +14,7 @@ from src.analysis import clusters as cluster_analysis
 from src.analysis import diffs as diff_analysis
 from src.analysis import geo as geo_analysis
 from src.analysis import tiltak as tiltak_analysis
-from src.collectors import ahrefs, chatgpt_geo, claude_geo, gemini_geo, gsc, gsc_oauth, perplexity_geo, storage
+from src.collectors import ahrefs, chatgpt_geo, claude_geo, ga4_oauth, gemini_geo, gsc, gsc_oauth, perplexity_geo, storage
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
 from src.report.generate import extract_recommendations, generate_report
@@ -177,10 +177,40 @@ def run_pipeline(
                 }
             )
 
+    # AI-referral-trafikk (sesjoner fra chatgpt.com/claude.ai/gemini.google.com/perplexity/
+    # copilot.com som sessionSource i GA4) — se src/collectors/ga4_oauth.py. Gjenbruker
+    # samme OAuth-refresh-token som GSC (utvidet med analytics.readonly-scope 29.07.2026).
+    #
+    # Kjøres over et rullerende 28-dagersvindu, IKKE ukens strenge periode (i motsetning
+    # til alt annet i denne pipelinen). Grunn: dette er lavvolum (typisk noen titalls
+    # økter totalt per kilde), og en streng uke-periode gir ustabile/misvisende tall —
+    # verifisert 29.07.2026 mot brukerens egen Looker Studio-rapport: en enkelt økt i et
+    # 7-dagersvindu ga f.eks. 100 % engasjement for claude.ai (ren tilfeldighet ved n=1),
+    # mens samme kilde over 28 dager (n=4) ga et langt mer troverdig 50 %. 28 dager valgt
+    # fordi det er standard Looker Studio-vindu og ga tall som stemte tett med brukerens
+    # egen rapport (chatgpt.com: 243 mot Lookers 270, 5 konverteringer identisk).
+    #
+    # VIKTIG: dette gjør ga4_ai_referral til det eneste feltet i analysis som IKKE
+    # dekker rapportens uke — periode_dager under må alltid leses med, og
+    # prompt_builder.py/dashboardet må omtale det som "siste 28 dager", ikke "denne uken".
+    ga4_ai_referral_rows: list[dict] = []
+    if settings.ga4_configured:
+        try:
+            ga4_window_end = today
+            ga4_window_start = ga4_window_end - timedelta(days=28)
+            ga4_ai_referral_rows = ga4_oauth.get_ai_referral_sessions(
+                settings, ga4_window_start.isoformat(), ga4_window_end.isoformat()
+            )
+        except HttpError as e:
+            logger.warning("GA4 AI-referral-henting feilet denne uken: %s", e)
+            data_gaps.append(f"GA4 AI-referral-henting feilet denne uken ({e}) — AI-referral-trafikk mangler.")
+
     conn = storage.get_connection()
     storage.save_rank_tracker_rows(conn, week_start_label, "desktop", rank_desktop)
     storage.save_rank_tracker_rows(conn, week_start_label, "mobile", rank_mobile)
     storage.save_gsc_site_rows(conn, week_start_label, gsc_site_rows)
+    if ga4_ai_referral_rows:
+        storage.save_ga4_ai_referral_rows(conn, week_start_label, ga4_ai_referral_rows)
     if gsc_query_rows:
         storage.save_gsc_rows(conn, week_start_label, "query", gsc_query_rows)
         prev_rows = conn.execute(
@@ -295,6 +325,8 @@ def run_pipeline(
             "chatgpt_selvsjekk": chatgpt_selfcheck,
             "gemini_selvsjekk": gemini_selfcheck,
             "perplexity_selvsjekk": perplexity_selfcheck,
+            "ga4_ai_referral": ga4_ai_referral_rows,
+            "ga4_ai_referral_periode_dager": 28,
         },
         "tiltak": tiltak_status,
         "konkurrenter": settings.competitors,
