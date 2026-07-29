@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
-"""Engangsoppsett: genererer en OAuth refresh-token for src/collectors/gsc_oauth.py.
+"""Engangsoppsett: genererer en OAuth refresh-token for src/collectors/gsc_oauth.py
+OG src/collectors/ga4_oauth.py (utvidet 29.07.2026 til å dekke begge — samme konto,
+samme flyt, ett token med to scopes i stedet for to separate tokens å holde styr på).
 
 Må kjøres av deg selv, interaktivt, med DIN egen Google-konto (den som allerede har
-"Begrenset" tilgang til sc-domain:krogsveen.no i Search Console). Åpner en nettleser for
-innlogging/samtykke — kan ikke automatiseres eller kjøres på dine vegne.
+"Begrenset" tilgang til sc-domain:krogsveen.no i Search Console, og minst leser-tilgang
+til GA4-eiendommen). Åpner en nettleser for innlogging/samtykke — kan ikke automatiseres
+eller kjøres på dine vegne.
 
 Forutsetning: en OAuth-klient (type "Desktop app") opprettet i Google Cloud Console
-(samme prosjekt som service-kontoen), med "Search Console API" (webmasters) aktivert.
-Se README/chat-instruks for nøyaktige steg.
+(samme prosjekt som service-kontoen), med "Search Console API" (webmasters) OG
+"Google Analytics Data API" aktivert. Se README/chat-instruks for nøyaktige steg.
+
+Hvis du allerede har et GSC-only-token fra før: du må kjøre dette på nytt for å få et
+token med BEGGE scopes — det gamle tokenet dekker ikke analytics.readonly, og GA4-kall
+vil feile med insufficient permission inntil det er byttet ut.
 
 Bruk:
     python scripts/gsc_auth_setup.py --client-id <ID> --client-secret <SECRET>
@@ -22,7 +29,10 @@ import argparse
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/webmasters.readonly",
+    "https://www.googleapis.com/auth/analytics.readonly",
+]
 
 
 def main() -> None:

@@ -63,6 +63,16 @@ CREATE TABLE IF NOT EXISTS organic_footprint_weekly (
     PRIMARY KEY (week_start, keyword)
 );
 
+CREATE TABLE IF NOT EXISTS ga4_ai_referral_weekly (
+    week_start TEXT NOT NULL,
+    source TEXT NOT NULL,
+    sessions INTEGER,
+    engagement_rate REAL,
+    avg_session_duration_sec REAL,
+    conversions REAL,
+    PRIMARY KEY (week_start, source)
+);
+
 CREATE TABLE IF NOT EXISTS content_briefs_meta (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     url TEXT NOT NULL,
@@ -239,6 +249,52 @@ def get_organic_footprint_trend(conn: sqlite3.Connection, weeks: int = 12) -> li
         (weeks,),
     )
     rows = [{"week_start": w, "keyword_count": n, "avg_position": round(p, 2)} for w, n, p in cur.fetchall()]
+    return list(reversed(rows))
+
+
+def save_ga4_ai_referral_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict]) -> None:
+    """rows fra src.collectors.ga4_oauth.get_ai_referral_sessions — sesjoner fra
+    chatgpt.com/claude.ai/gemini.google.com/perplexity/copilot.com som sessionSource,
+    for trend over tid (roadmap: GEO-visibility vs. faktisk AI-referral-trafikk).
+
+    NB: week_start her er kun "hvilken ukes kjøring dette ble lagret av", ikke
+    datointervallet dataen faktisk dekker — rows er hentet over et rullerende 28-
+    dagersvindu (se pipeline.py), ikke ukens strenge periode som resten av tabellene.
+    Lavvolum-metrikk over kun 7 dager ga ustabile/misvisende tall (verifisert 29.07.2026)."""
+    conn.executemany(
+        """INSERT OR REPLACE INTO ga4_ai_referral_weekly
+           (week_start, source, sessions, engagement_rate, avg_session_duration_sec, conversions)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        [
+            (
+                week_start,
+                r.get("source"),
+                r.get("sessions"),
+                r.get("engagement_rate"),
+                r.get("avg_session_duration_sec"),
+                r.get("conversions"),
+            )
+            for r in rows
+        ],
+    )
+    conn.commit()
+
+
+def get_ga4_ai_referral_trend(conn: sqlite3.Connection, weeks: int = 12) -> list[dict]:
+    """Totale AI-referral-sesjoner (summert på tvers av kilder) per uke — for å se om
+    AI-drevet trafikk beveger seg over tid, ikke bare denne ukens øyeblikksbilde."""
+    cur = conn.execute(
+        """SELECT week_start, SUM(sessions) as total_sessions, SUM(conversions) as total_conversions
+           FROM ga4_ai_referral_weekly
+           GROUP BY week_start
+           ORDER BY week_start DESC
+           LIMIT ?""",
+        (weeks,),
+    )
+    rows = [
+        {"week_start": w, "total_sessions": s or 0, "total_conversions": c or 0}
+        for w, s, c in cur.fetchall()
+    ]
     return list(reversed(rows))
 
 
