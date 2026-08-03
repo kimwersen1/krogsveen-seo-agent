@@ -204,6 +204,9 @@ _TEMPLATE = r"""<!doctype html>
   .cluster-track .seg-down { background: var(--critical); }
   .cluster-track .seg-flat { background: var(--line-strong); }
   .cluster-count { text-align: right; color: var(--ink-muted); }
+  .cluster-examples { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-muted); padding: 0 0 8px; line-height: 1.6; }
+  .cluster-examples .up { color: var(--good); font-weight: 600; }
+  .cluster-examples .down { color: var(--critical); font-weight: 600; }
   .cluster-delta { text-align: right; font-weight: 600; }
   .cluster-delta.up { color: var(--good); }
   .cluster-delta.down { color: var(--critical); }
@@ -531,6 +534,12 @@ _TEMPLATE = r"""<!doctype html>
   document.getElementById("cluster-sub").textContent =
     "Mobil, uke-mot-uke — " + totalTracked + " sporede søkeord på tvers av clustre. " +
     "Snittendring i posisjonsplasser (grønn = bedre plassering i søkeresultatet, rød = dårligere).";
+  function fmtKwMove(row) {
+    var delta = (row.position_prev != null && row.position != null) ? row.position_prev - row.position : null;
+    var sign = delta != null && delta > 0 ? "+" : "";
+    var deltaText = delta != null ? " (" + sign + delta + ", " + row.position_prev + "→" + row.position + ")" : "";
+    return row.keyword + deltaText;
+  }
   (data.cluster_summaries || []).forEach(function (c) {
     var total = c.improved + c.declined + c.unchanged || 1;
     var row = document.createElement("div");
@@ -541,6 +550,19 @@ _TEMPLATE = r"""<!doctype html>
       : c.avg_position_delta < 0
         ? Math.abs(c.avg_position_delta).toFixed(1) + " plasser dårligere"
         : "uendret";
+    // Konkrete søkeord bak snittendringen — en aggregert prosent/plassering alene sier
+    // ingenting om hva som faktisk skjedde (bruker etterspurte dette 03.08.2026, samme
+    // begrunnelse som Avvik-tabellens url-kolonne).
+    var examples = [];
+    if ((c.top_gainers || []).length) {
+      examples.push('<span class="up">▲ ' + c.top_gainers.map(fmtKwMove).join(", ") + '</span>');
+    }
+    if ((c.top_losers || []).length) {
+      examples.push('<span class="down">▼ ' + c.top_losers.map(fmtKwMove).join(", ") + '</span>');
+    }
+    var examplesHtml = examples.length
+      ? '<div class="cluster-examples" style="grid-column:1 / -1">' + examples.join(" &nbsp;·&nbsp; ") + '</div>'
+      : "";
     row.innerHTML =
       '<span class="cluster-name">' + c.name + '</span>' +
       '<span class="cluster-track">' +
@@ -549,7 +571,8 @@ _TEMPLATE = r"""<!doctype html>
         '<span class="seg-flat" style="flex:' + c.unchanged + '"></span>' +
       '</span>' +
       '<span class="cluster-count">' + c.keyword_count + '</span>' +
-      '<span class="cluster-delta ' + deltaClass + '">' + deltaLabel + '</span>';
+      '<span class="cluster-delta ' + deltaClass + '">' + deltaLabel + '</span>' +
+      examplesHtml;
     clusterWrap.appendChild(row);
   });
 
