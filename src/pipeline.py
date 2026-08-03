@@ -276,14 +276,21 @@ def run_pipeline(
         elif not settings.perplexity_api_key:
             data_gaps.append("Perplexity-selvsjekk hoppet over — PERPLEXITY_API_KEY er ikke satt i .env.")
 
-    tagged_desktop = cluster_analysis.tag_rows(rank_desktop, settings.clusters)
-    cluster_summaries = diff_analysis.summarize_all_clusters(tagged_desktop, list(settings.clusters.keys()))
+    # Mobil er primærkilden for all posisjonsanalyse (cluster, avvik, tiltak, AI Overview),
+    # ikke desktop — ~70 % av søkevolumet er mobil, og desktop har mange null-posisjoner
+    # (kjent forhold, se CLAUDE.md). Tidligere brukte hele analysen desktop, som ga en
+    # skjev/noen ganger motsatt konklusjon av mobil for samme søkeord (f.eks. "eiendomspriser
+    # kart": desktop 19→30, mobil 18→11 samme uke — oppdaget 03.08.2026). Desktop lagres
+    # fortsatt til historikk, men brukes ikke lenger i analysen.
+    tagged_mobile = cluster_analysis.tag_rows(rank_mobile, settings.clusters)
+    cluster_summaries = diff_analysis.summarize_all_clusters(tagged_mobile, list(settings.clusters.keys()))
     anomalies = diff_analysis.detect_anomalies(
-        tagged_desktop, gsc_by_keyword, settings.posisjon_terskel, settings.klikk_terskel_pct
+        tagged_mobile, gsc_by_keyword, settings.posisjon_terskel, settings.klikk_terskel_pct
     )
-    ai_overview_keywords = geo_analysis.keywords_with_ai_overview(tagged_desktop)
+    ai_overview_keywords = geo_analysis.keywords_with_ai_overview(tagged_mobile)
 
-    history_rows = storage.get_history(conn, "rank_tracker_weekly", weeks=8)
+    history_rows_all = storage.get_history(conn, "rank_tracker_weekly", weeks=8)
+    history_rows = [r for r in history_rows_all if r.get("device") == "mobile"]
     tiltak_status = tiltak_analysis.classify_all(settings.tiltak, history_rows, today)
 
     position_trend = storage.get_position_trend(conn, weeks=12)

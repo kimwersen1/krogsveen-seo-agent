@@ -5,7 +5,9 @@ import json
 
 REPORT_FORMAT = """
 1. Hovedbildet (3–5 setninger).
-2. Per cluster: snittendring, antall opp/ned, topp 3 bevegelser hver vei. Bruk
+2. Per cluster: snittendring, antall opp/ned, topp 3 bevegelser hver vei. All posisjonsdata
+   (cluster_summaries, avvik, tiltak) er fra mobil (~70 % av søkevolumet) — trenger ikke
+   nevnes eksplisitt med mindre du sammenligner mot noe som er desktop-basert. Bruk
    organisk_fotavtrykk (bredere enn de sporede Rank Tracker-ordene — hele domenets
    synlige søkeord per cluster) som context der det er relevant, f.eks. hvis et cluster
    har mange usporede søkeord med god posisjon, eller påfallende få totalt — ikke behandle
@@ -36,7 +38,8 @@ REPORT_FORMAT = """
       (alltid 28) forteller hvor mange dager tallene faktisk dekker. Omtal det eksplisitt
       som "siste 28 dager" (eller tilsvarende), aldri som "denne uken" — lavvolum-tallene
       her blir ustabile/misvisende over en enkelt uke, derfor det lengre vinduet.
-4. Tiltaks-effekt.
+4. Tiltaks-effekt. Hvert tiltak har malord_posisjoner (første → siste kjente posisjon per
+   målord) — bruk faktiske tall her ("boligverdi: 8→3"), ikke bare statusetiketten.
 5. Avvik (>3 pos / >20 % klikk). Posisjonsavvik har et url-felt — nevn siden når den er
    kjent, ikke bare søkeordet, slik at avviket kan knyttes til en konkret side dere har
    jobbet med. Klikkavvik mangler url (GSC sin query-dimensjon gir ikke side per søkeord)

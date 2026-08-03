@@ -272,7 +272,7 @@ _TEMPLATE = r"""<!doctype html>
   <div class="two-col">
     <div class="card">
       <h2>Snittposisjon over tid</h2>
-      <div class="card-sub">Alle sporede søkeord, desktop</div>
+      <div class="card-sub">Alle sporede søkeord, mobil (~70 % av søkevolumet)</div>
       <div id="position-chart"></div>
     </div>
     <div class="card">
@@ -308,7 +308,8 @@ _TEMPLATE = r"""<!doctype html>
 
   <div class="card">
     <h2>Tiltaks-status</h2>
-    <div class="table-scroll"><table id="tiltak-table"><thead><tr><th>Side</th><th>Målord</th><th>Status</th><th>Uker aktiv</th></tr></thead><tbody></tbody></table></div>
+    <div class="card-sub">Posisjon viser første → siste kjente uke per målord (mobil) — den samme kilden som resten av siden, ikke bare en statusetikett</div>
+    <div class="table-scroll"><table id="tiltak-table"><thead><tr><th>Side</th><th>Målord</th><th>Posisjon</th><th>Status</th><th>Uker aktiv</th></tr></thead><tbody></tbody></table></div>
   </div>
 
   <div class="card">
@@ -381,15 +382,35 @@ _TEMPLATE = r"""<!doctype html>
 
   // ---- Stat tiles ----
   var statGrid = document.getElementById("stat-grid");
-  function addStat(label, value, delta) {
+  function addStat(label, value, delta, deltaClass) {
     var tile = document.createElement("div");
     tile.className = "stat-tile";
     tile.innerHTML =
       '<div class="label">' + label + '</div>' +
       '<div class="value num">' + value + '</div>' +
-      (delta ? '<div class="delta">' + delta + '</div>' : "");
+      (delta ? '<div class="delta' + (deltaClass ? " cluster-delta " + deltaClass : "") + '">' + delta + '</div>' : "");
     statGrid.appendChild(tile);
   }
+
+  // ---- Snittposisjon-trend (mobil) — svarer på "har siden generelt blitt sterkere?"
+  // ved å sammenligne eldste og nyeste uke i det 12-ukers vinduet vi allerede har. ----
+  var posTrend = data.position_trend || [];
+  if (posTrend.length >= 2) {
+    var oldestPos = posTrend[0].avg_position;
+    var newestPos = posTrend[posTrend.length - 1].avg_position;
+    var posDiff = oldestPos - newestPos; // positivt = forbedring (lavere posisjon er bedre)
+    var posCls = posDiff > 0.05 ? "up" : (posDiff < -0.05 ? "down" : "flat");
+    var posLabel = posDiff > 0.05 ? "bedre" : (posDiff < -0.05 ? "svakere" : "uendret");
+    addStat(
+      "Snittposisjon (mobil)",
+      newestPos.toFixed(1),
+      Math.abs(posDiff).toFixed(1) + " plasser " + posLabel + " siste " + (posTrend.length - 1) + " uker",
+      posCls
+    );
+  } else {
+    addStat("Snittposisjon (mobil)", posTrend.length ? posTrend[0].avg_position.toFixed(1) : "–", "for lite historikk ennå");
+  }
+
   // Rad 1: generelle SEO-nøkkeltall. Rad 2: GEO-selvsjekk per kilde — 8 ruter totalt
   // for en jevn 4x2-rutenett (bruker ba om dette 22.07.2026).
   addStat("Domain Rating", data.domain_rating ? data.domain_rating.domain_rating || "–" : "–");
@@ -435,7 +456,7 @@ _TEMPLATE = r"""<!doctype html>
 
   // ---- AI Overview-søkeord ----
   var aiRows = data.geo.ai_overview_sokeord || [];
-  document.getElementById("ai-overview-sub").textContent = aiRows.length + " søkeord denne uken (desktop)";
+  document.getElementById("ai-overview-sub").textContent = aiRows.length + " søkeord denne uken (mobil)";
   var aiList = document.getElementById("ai-overview-list");
   aiRows.forEach(function (r) {
     var row = document.createElement("div");
@@ -508,7 +529,7 @@ _TEMPLATE = r"""<!doctype html>
   var clusterWrap = document.getElementById("cluster-rows");
   var totalTracked = (data.cluster_summaries || []).reduce(function (s, c) { return s + c.keyword_count; }, 0);
   document.getElementById("cluster-sub").textContent =
-    "Desktop, uke-mot-uke — " + totalTracked + " sporede søkeord på tvers av clustre. " +
+    "Mobil, uke-mot-uke — " + totalTracked + " sporede søkeord på tvers av clustre. " +
     "Snittendring i posisjonsplasser (grønn = bedre plassering i søkeresultatet, rød = dårligere).";
   (data.cluster_summaries || []).forEach(function (c) {
     var total = c.improved + c.declined + c.unchanged || 1;
@@ -661,9 +682,17 @@ _TEMPLATE = r"""<!doctype html>
   (data.tiltak || []).forEach(function (t) {
     var statusKey = STATUS_CLASS[t.status_vurdering] || "ikke_vurdert";
     var tr = document.createElement("tr");
+    var posisjonHtml = (t.malord_posisjoner || []).map(function (mp) {
+      if (mp.posisjon_forst == null || mp.posisjon_sist == null) {
+        return mp.malord + ": –";
+      }
+      var cls = mp.posisjon_sist < mp.posisjon_forst ? "up" : (mp.posisjon_sist > mp.posisjon_forst ? "down" : "flat");
+      return mp.malord + ': <span class="cluster-delta ' + cls + '">' + mp.posisjon_forst + " → " + mp.posisjon_sist + '</span>';
+    }).join("<br>") || "–";
     tr.innerHTML =
       '<td class="mono">' + (t.side || "") + '</td>' +
       '<td>' + (t.malord || []).join(", ") + '</td>' +
+      '<td>' + posisjonHtml + '</td>' +
       '<td><span class="tiltak-status ' + statusKey + '">' + (t.status_vurdering || "ikke vurdert") + '</span></td>' +
       '<td>' + (t.uker_aktiv != null ? t.uker_aktiv : "–") + '</td>';
     tiltakBody.appendChild(tr);
