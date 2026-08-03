@@ -297,7 +297,7 @@ _TEMPLATE = r"""<!doctype html>
   <div class="card" id="avvik-card" style="display:none">
     <h2>Avvik</h2>
     <div class="card-sub">Søkeord med posisjonsendring &gt;3 plasser eller klikkendring &gt;20 % — samme uke-mot-uke-data som ligger i rapporten, ikke bare cluster-snittet</div>
-    <div class="table-scroll"><table id="avvik-table"><thead><tr><th>Søkeord</th><th>Type</th><th>Endring</th><th>Fra → til</th></tr></thead><tbody></tbody></table></div>
+    <div class="table-scroll"><table id="avvik-table"><thead><tr><th>Søkeord</th><th>Side</th><th>Type</th><th>Endring</th><th>Fra → til</th></tr></thead><tbody></tbody></table></div>
   </div>
 
   <div class="card">
@@ -551,8 +551,14 @@ _TEMPLATE = r"""<!doctype html>
         endring = (a.pct_change > 0 ? "+" : "") + a.pct_change + "%";
         fraTil = fmt.format(a.clicks_prev || 0) + " → " + fmt.format(a.clicks || 0);
       }
+      var sideCell = "–";
+      if (a.url) {
+        var displayPath = a.url.replace(/^https?:\/\/(www\.)?krogsveen\.no/, "") || "/";
+        sideCell = '<a href="' + a.url + '" target="_blank" rel="noopener" class="mono">' + displayPath + '</a>';
+      }
       tr.innerHTML =
         '<td class="mono">' + a.keyword + '</td>' +
+        '<td>' + sideCell + '</td>' +
         '<td>' + typeLabel + '</td>' +
         '<td class="cluster-delta ' + endringClass + '">' + endring + '</td>' +
         '<td>' + fraTil + '</td>';

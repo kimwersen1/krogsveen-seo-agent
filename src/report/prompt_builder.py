@@ -37,7 +37,10 @@ REPORT_FORMAT = """
       som "siste 28 dager" (eller tilsvarende), aldri som "denne uken" — lavvolum-tallene
       her blir ustabile/misvisende over en enkelt uke, derfor det lengre vinduet.
 4. Tiltaks-effekt.
-5. Avvik (>3 pos / >20 % klikk).
+5. Avvik (>3 pos / >20 % klikk). Posisjonsavvik har et url-felt — nevn siden når den er
+   kjent, ikke bare søkeordet, slik at avviket kan knyttes til en konkret side dere har
+   jobbet med. Klikkavvik mangler url (GSC sin query-dimensjon gir ikke side per søkeord)
+   — ikke fabriker en side der den mangler.
 6. Anbefaling for kommende uke (2–3 punkter).
 Ærlig om datamangler. Ingen rådata-dumper.
 """.strip()

@@ -73,6 +73,7 @@ def detect_anomalies(
                     "delta": delta,
                     "position": row.get("position"),
                     "position_prev": row.get("position_prev"),
+                    "url": row.get("url"),
                 }
             )
         gsc = gsc_by_keyword.get(keyword.strip().lower())
