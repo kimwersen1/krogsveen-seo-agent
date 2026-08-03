@@ -59,8 +59,13 @@ def detect_anomalies(
     gsc_by_keyword: dict[str, dict],
     position_threshold: int,
     click_pct_threshold: float,
+    click_min_volume: int = 10,
 ) -> list[dict]:
-    """gsc_by_keyword: {søkeord (lowercase): {"clicks": int, "clicks_prev": int}}."""
+    """gsc_by_keyword: {søkeord (lowercase): {"clicks": int, "clicks_prev": int}}.
+
+    click_min_volume: krever at maks(clicks, clicks_prev) >= denne før en prosentendring
+    telles som avvik. Uten denne blir f.eks. 1→2 klikk vist som "+100 %" — matematisk
+    riktig, men støy, ikke signal (oppdaget 03.08.2026 ved brukertilbakemelding)."""
     anomalies = []
     for row in tagged_rows:
         keyword = row.get("keyword", "")
@@ -77,7 +82,7 @@ def detect_anomalies(
                 }
             )
         gsc = gsc_by_keyword.get(keyword.strip().lower())
-        if gsc and gsc.get("clicks_prev"):
+        if gsc and gsc.get("clicks_prev") and max(gsc["clicks"], gsc["clicks_prev"]) >= click_min_volume:
             pct = (gsc["clicks"] - gsc["clicks_prev"]) / gsc["clicks_prev"] * 100
             if abs(pct) > click_pct_threshold:
                 anomalies.append(

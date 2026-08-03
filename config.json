@@ -62,6 +62,7 @@
   ],
   "varsel_terskler": {
     "posisjon_endring": 3,
-    "klikk_endring_pct": 20
+    "klikk_endring_pct": 20,
+    "klikk_min_volum": 10
   }
 }

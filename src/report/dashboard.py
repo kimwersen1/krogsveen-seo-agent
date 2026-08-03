@@ -24,6 +24,7 @@ def build_dashboard_payload(
     competitor_benchmark: list[dict],
     report_date: date,
     footprint_trend: list[dict] | None = None,
+    footprint_cluster_trend: list[dict] | None = None,
 ) -> dict:
     return {
         "generated": report_date.isoformat(),
@@ -44,6 +45,7 @@ def build_dashboard_payload(
         "position_trend": position_trend,
         "clicks_trend": clicks_trend,
         "footprint_trend": footprint_trend or [],
+        "footprint_cluster_trend": footprint_cluster_trend or [],
         "competitor_benchmark": competitor_benchmark,
     }
 
@@ -199,14 +201,9 @@ _TEMPLATE = r"""<!doctype html>
   .cluster-header { font-size: 11px; color: var(--ink-muted); border-bottom: 1px solid var(--line-strong); padding-bottom: 8px; font-weight: 600; }
   .cluster-row:last-child { border-bottom: none; }
   .cluster-name { font-weight: 600; }
-  .cluster-track { height: 7px; border-radius: 4px; background: var(--bg-surface-2); overflow: hidden; display: flex; }
-  .cluster-track .seg-up { background: var(--good); }
-  .cluster-track .seg-down { background: var(--critical); }
-  .cluster-track .seg-flat { background: var(--line-strong); }
+  .cluster-track { display: block; height: 7px; border-radius: 4px; background: var(--bg-surface-2); overflow: hidden; }
+  .cluster-track .fill { display: block; background: var(--accent); height: 100%; }
   .cluster-count { text-align: right; color: var(--ink-muted); }
-  .cluster-examples { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-muted); padding: 0 0 8px; line-height: 1.6; }
-  .cluster-examples .up { color: var(--good); font-weight: 600; }
-  .cluster-examples .down { color: var(--critical); font-weight: 600; }
   .cluster-delta { text-align: right; font-weight: 600; }
   .cluster-delta.up { color: var(--good); }
   .cluster-delta.down { color: var(--critical); }
@@ -275,7 +272,7 @@ _TEMPLATE = r"""<!doctype html>
   <div class="two-col">
     <div class="card">
       <h2>Snittposisjon over tid</h2>
-      <div class="card-sub">Alle sporede søkeord, mobil (~70 % av søkevolumet)</div>
+      <div class="card-sub" id="position-chart-sub">Alle sporede søkeord, mobil (~70 % av søkevolumet)</div>
       <div id="position-chart"></div>
     </div>
     <div class="card">
@@ -285,21 +282,27 @@ _TEMPLATE = r"""<!doctype html>
     </div>
   </div>
 
+  <div class="card" id="ga4-card" style="display:none">
+    <h2>AI-referral-trafikk <span id="ga4-period-badge" class="card-sub" style="font-weight:normal"></span></h2>
+    <div class="card-sub">Faktiske økter fra AI-chatter (GA4) — selvsjekken lenger ned viser om Krogsveen nevnes, dette viser om noen faktisk klikker seg inn. Lavvolum-tall, derfor et lengre vindu enn resten av siden (som viser denne uken).</div>
+    <div class="table-scroll"><table id="ga4-table"><thead><tr><th>Kilde</th><th>Økter</th><th>Engasjement</th><th>Konverteringer</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
   <div class="card">
-    <h2>Cluster-bevegelse denne uken</h2>
+    <h2>Synlighet per cluster over tid</h2>
     <div class="card-sub" id="cluster-sub"></div>
     <div class="cluster-row cluster-header">
       <span>Cluster</span>
-      <span>Fordeling av søkeord i clusteret: <span style="color:var(--good)">■ bedre</span> · <span style="color:var(--critical)">■ dårligere</span> · <span style="color:var(--ink-muted)">■ uendret</span></span>
-      <span style="text-align:right">Antall</span>
-      <span style="text-align:right">Snittendring</span>
+      <span>Andel av total synlighet i topp 50</span>
+      <span style="text-align:right">Søkeord i topp 50</span>
+      <span style="text-align:right">Endring</span>
     </div>
     <div id="cluster-rows"></div>
   </div>
 
   <div class="card" id="avvik-card" style="display:none">
     <h2>Avvik</h2>
-    <div class="card-sub">Søkeord med posisjonsendring &gt;3 plasser eller klikkendring &gt;20 % — samme uke-mot-uke-data som ligger i rapporten, ikke bare cluster-snittet</div>
+    <div class="card-sub">Søkeord med posisjonsendring &gt;3 plasser eller klikkendring &gt;20 % (minst 10 klikk i én av ukene, for å luke ut støy som "1→2 klikk = +100 %") — samme uke-mot-uke-data som ligger i rapporten, ikke bare cluster-snittet</div>
     <div class="table-scroll"><table id="avvik-table"><thead><tr><th>Søkeord</th><th>Side</th><th>Type</th><th>Endring</th><th>Fra → til</th></tr></thead><tbody></tbody></table></div>
   </div>
 
@@ -331,12 +334,6 @@ _TEMPLATE = r"""<!doctype html>
     <h2>GEO / AI-synlighet</h2>
     <div class="card-sub">Egen selvsjekk mot Claude, ChatGPT, Gemini og Perplexity — ekte data, 36 prompts hver</div>
     <div id="geo-panel"></div>
-  </div>
-
-  <div class="card" id="ga4-card" style="display:none">
-    <h2>AI-referral-trafikk <span id="ga4-period-badge" class="card-sub" style="font-weight:normal"></span></h2>
-    <div class="card-sub">Faktiske økter fra AI-chatter (GA4) — selvsjekken over viser om Krogsveen nevnes, dette viser om noen faktisk klikker seg inn. Lavvolum-tall, derfor et lengre vindu enn resten av siden (som viser denne uken).</div>
-    <div class="table-scroll"><table id="ga4-table"><thead><tr><th>Kilde</th><th>Økter</th><th>Engasjement</th><th>Konverteringer</th></tr></thead><tbody></tbody></table></div>
   </div>
 
   <footer>
@@ -395,23 +392,19 @@ _TEMPLATE = r"""<!doctype html>
     statGrid.appendChild(tile);
   }
 
-  // ---- Snittposisjon-trend (mobil) — svarer på "har siden generelt blitt sterkere?"
-  // ved å sammenligne eldste og nyeste uke i det 12-ukers vinduet vi allerede har. ----
+  // ---- Snittposisjon-trend (mobil) — svarer på "har siden generelt blitt sterkere?" ved
+  // å sammenligne eldste og nyeste uke i vinduet. Vises som tekst under selve grafen den
+  // beskriver, ikke som egen firkant i stat-gridet (bruker ba om dette 03.08.2026). ----
   var posTrend = data.position_trend || [];
+  var posSubEl = document.getElementById("position-chart-sub");
   if (posTrend.length >= 2) {
     var oldestPos = posTrend[0].avg_position;
     var newestPos = posTrend[posTrend.length - 1].avg_position;
     var posDiff = oldestPos - newestPos; // positivt = forbedring (lavere posisjon er bedre)
-    var posCls = posDiff > 0.05 ? "up" : (posDiff < -0.05 ? "down" : "flat");
     var posLabel = posDiff > 0.05 ? "bedre" : (posDiff < -0.05 ? "svakere" : "uendret");
-    addStat(
-      "Snittposisjon (mobil)",
-      newestPos.toFixed(1),
-      Math.abs(posDiff).toFixed(1) + " plasser " + posLabel + " siste " + (posTrend.length - 1) + " uker",
-      posCls
-    );
-  } else {
-    addStat("Snittposisjon (mobil)", posTrend.length ? posTrend[0].avg_position.toFixed(1) : "–", "for lite historikk ennå");
+    posSubEl.textContent =
+      "Alle sporede søkeord, mobil (~70 % av søkevolumet) — " +
+      Math.abs(posDiff).toFixed(1) + " plasser " + posLabel + " siste " + (posTrend.length - 1) + " uker.";
   }
 
   // Rad 1: generelle SEO-nøkkeltall. Rad 2: GEO-selvsjekk per kilde — 8 ruter totalt
@@ -528,53 +521,33 @@ _TEMPLATE = r"""<!doctype html>
   renderTrendChart("position-chart", data.position_trend, "avg_position", series1Color, "Snittposisjon");
   renderTrendChart("clicks-chart", data.clicks_trend, "clicks", series2Color, "Klikk");
 
-  // ---- Cluster rows ----
+  // ---- Cluster rows: synlighetsbredde (topp 50, hele domenet) per cluster, ikke
+  // uke-mot-uke posisjons-snittendring på de 338 sporede ordene — mer stabilt og
+  // lettere å tolke for markedsføring (erstattet Cluster-bevegelse 03.08.2026 etter
+  // brukertilbakemelding om at posisjons-snittet ga lite verdi). ----
   var clusterWrap = document.getElementById("cluster-rows");
-  var totalTracked = (data.cluster_summaries || []).reduce(function (s, c) { return s + c.keyword_count; }, 0);
-  document.getElementById("cluster-sub").textContent =
-    "Mobil, uke-mot-uke — " + totalTracked + " sporede søkeord på tvers av clustre. " +
-    "Snittendring i posisjonsplasser (grønn = bedre plassering i søkeresultatet, rød = dårligere).";
-  function fmtKwMove(row) {
-    var delta = (row.position_prev != null && row.position != null) ? row.position_prev - row.position : null;
-    var sign = delta != null && delta > 0 ? "+" : "";
-    var deltaText = delta != null ? " (" + sign + delta + ", " + row.position_prev + "→" + row.position + ")" : "";
-    return row.keyword + deltaText;
-  }
-  (data.cluster_summaries || []).forEach(function (c) {
-    var total = c.improved + c.declined + c.unchanged || 1;
+  var footprintClusterRows = data.footprint_cluster_trend || [];
+  var totalFootprintClusters = footprintClusterRows.reduce(function (s, c) { return s + c.keyword_count; }, 0) || 1;
+  var clusterWeeksSpan = footprintClusterRows.length ? footprintClusterRows[0].weeks_span : 0;
+  document.getElementById("cluster-sub").textContent = clusterWeeksSpan
+    ? "Endring i antall søkeord i topp 50 siste " + clusterWeeksSpan + " uker, per cluster."
+    : "Antall søkeord i topp 50 denne uken, per cluster — for lite historikk ennå til å vise endring.";
+  footprintClusterRows.forEach(function (c) {
     var row = document.createElement("div");
     row.className = "cluster-row";
-    var deltaClass = c.avg_position_delta > 0 ? "up" : c.avg_position_delta < 0 ? "down" : "flat";
-    var deltaLabel = c.avg_position_delta > 0
-      ? Math.abs(c.avg_position_delta).toFixed(1) + " plasser bedre"
-      : c.avg_position_delta < 0
-        ? Math.abs(c.avg_position_delta).toFixed(1) + " plasser dårligere"
-        : "uendret";
-    // Konkrete søkeord bak snittendringen — en aggregert prosent/plassering alene sier
-    // ingenting om hva som faktisk skjedde (bruker etterspurte dette 03.08.2026, samme
-    // begrunnelse som Avvik-tabellens url-kolonne).
-    var examples = [];
-    if ((c.top_gainers || []).length) {
-      examples.push('<span class="up">▲ ' + c.top_gainers.map(fmtKwMove).join(", ") + '</span>');
-    }
-    if ((c.top_losers || []).length) {
-      examples.push('<span class="down">▼ ' + c.top_losers.map(fmtKwMove).join(", ") + '</span>');
-    }
-    var examplesHtml = examples.length
-      ? '<div class="cluster-examples" style="grid-column:1 / -1">' + examples.join(" &nbsp;·&nbsp; ") + '</div>'
-      : "";
+    var share = (c.keyword_count / totalFootprintClusters) * 100;
+    var deltaClass = c.delta > 0 ? "up" : c.delta < 0 ? "down" : "flat";
+    var deltaLabel = c.delta > 0 ? "+" + c.delta + " søkeord" : c.delta < 0 ? c.delta + " søkeord" : "uendret";
     row.innerHTML =
       '<span class="cluster-name">' + c.name + '</span>' +
-      '<span class="cluster-track">' +
-        '<span class="seg-up" style="flex:' + c.improved + '"></span>' +
-        '<span class="seg-down" style="flex:' + c.declined + '"></span>' +
-        '<span class="seg-flat" style="flex:' + c.unchanged + '"></span>' +
-      '</span>' +
+      '<span class="cluster-track"><span class="fill" style="width:' + share.toFixed(1) + '%"></span></span>' +
       '<span class="cluster-count">' + c.keyword_count + '</span>' +
-      '<span class="cluster-delta ' + deltaClass + '">' + deltaLabel + '</span>' +
-      examplesHtml;
+      '<span class="cluster-delta ' + deltaClass + '">' + deltaLabel + '</span>';
     clusterWrap.appendChild(row);
   });
+  if (!footprintClusterRows.length) {
+    clusterWrap.innerHTML = '<div style="padding:10px 0;color:var(--ink-muted);font-size:12.5px">Ingen data ennå.</div>';
+  }
 
   // ---- Avvik ----
   var avvikRows = data.avvik || [];

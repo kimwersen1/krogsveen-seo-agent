@@ -252,6 +252,48 @@ def get_organic_footprint_trend(conn: sqlite3.Connection, weeks: int = 12) -> li
     return list(reversed(rows))
 
 
+def get_footprint_trend_by_cluster(conn: sqlite3.Connection, cluster_names: list[str], weeks: int = 8) -> list[dict]:
+    """Antall søkeord i topp 50 (hele domenet, ikke bare de sporede Rank Tracker-ordene)
+    per cluster, første og siste kjente uke i vinduet — en bredde-/synlighetstrend som er
+    mer stabil og lettere å tolke for markedsføring enn en uke-mot-uke posisjons-snittendring
+    på 338 ord (erstattet Cluster-bevegelse-kortet 03.08.2026 etter brukertilbakemelding)."""
+    week_starts_cur = conn.execute(
+        "SELECT DISTINCT week_start FROM organic_footprint_weekly ORDER BY week_start DESC LIMIT ?",
+        (weeks,),
+    )
+    week_starts = sorted(row[0] for row in week_starts_cur.fetchall())
+    if len(week_starts) < 1:
+        return []
+
+    def _count_by_cluster(week_start: str) -> dict[str, int]:
+        cur = conn.execute(
+            "SELECT clusters FROM organic_footprint_weekly WHERE week_start = ? AND position IS NOT NULL",
+            (week_start,),
+        )
+        counts: dict[str, int] = {}
+        for (clusters_json,) in cur.fetchall():
+            for name in json.loads(clusters_json or "[]"):
+                counts[name] = counts.get(name, 0) + 1
+        return counts
+
+    first_counts = _count_by_cluster(week_starts[0])
+    last_counts = _count_by_cluster(week_starts[-1])
+
+    result = []
+    for name in cluster_names:
+        first_n = first_counts.get(name, 0)
+        last_n = last_counts.get(name, 0)
+        result.append(
+            {
+                "name": name,
+                "keyword_count": last_n,
+                "delta": last_n - first_n,
+                "weeks_span": max(len(week_starts) - 1, 0),
+            }
+        )
+    return result
+
+
 def save_ga4_ai_referral_rows(conn: sqlite3.Connection, week_start: str, rows: list[dict]) -> None:
     """rows fra src.collectors.ga4_oauth.get_ai_referral_sessions — sesjoner fra
     chatgpt.com/claude.ai/gemini.google.com/perplexity/copilot.com som sessionSource,

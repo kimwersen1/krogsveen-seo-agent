@@ -285,7 +285,7 @@ def run_pipeline(
     tagged_mobile = cluster_analysis.tag_rows(rank_mobile, settings.clusters)
     cluster_summaries = diff_analysis.summarize_all_clusters(tagged_mobile, list(settings.clusters.keys()))
     anomalies = diff_analysis.detect_anomalies(
-        tagged_mobile, gsc_by_keyword, settings.posisjon_terskel, settings.klikk_terskel_pct
+        tagged_mobile, gsc_by_keyword, settings.posisjon_terskel, settings.klikk_terskel_pct, settings.klikk_min_volum
     )
     ai_overview_keywords = geo_analysis.keywords_with_ai_overview(tagged_mobile)
 
@@ -303,6 +303,7 @@ def run_pipeline(
         tagged_footprint, list(settings.clusters.keys())
     )
     footprint_trend = storage.get_organic_footprint_trend(conn, weeks=12)
+    footprint_cluster_trend = storage.get_footprint_trend_by_cluster(conn, list(settings.clusters.keys()), weeks=8)
 
     # Innholdsforslag genereres kun to ganger i måneden (scripts/keyword_discovery.py
     # --to-drive, dyrere konkurrent-gap-data gir bedre forslag enn den ukentlige gratis
@@ -346,7 +347,7 @@ def run_pipeline(
     title = report_title(today)
 
     dashboard_payload = build_dashboard_payload(
-        analysis, position_trend, clicks_trend, competitor_benchmark, today, footprint_trend
+        analysis, position_trend, clicks_trend, competitor_benchmark, today, footprint_trend, footprint_cluster_trend
     )
     dashboard_path = render_dashboard(dashboard_payload)
 
