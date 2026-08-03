@@ -319,11 +319,13 @@ def get_content_briefs_meta(conn: sqlite3.Connection) -> dict | None:
 
 
 def get_position_trend(conn: sqlite3.Connection, weeks: int = 12) -> list[dict]:
-    """Snitt-posisjon (desktop) per uke på tvers av alle sporede søkeord — for dashboard-trendgraf."""
+    """Snitt-posisjon (mobil — ~70 % av søkevolumet, se CLAUDE.md) per uke på tvers av
+    alle sporede søkeord — for dashboard-trendgraf. Byttet fra desktop 03.08.2026: desktop
+    har mange null-posisjoner og kan vise motsatt trend av mobil for samme søkeord."""
     cur = conn.execute(
         """SELECT week_start, AVG(position) as avg_position, COUNT(*) as n
            FROM rank_tracker_weekly
-           WHERE device = 'desktop' AND position IS NOT NULL
+           WHERE device = 'mobile' AND position IS NOT NULL
            GROUP BY week_start
            ORDER BY week_start DESC
            LIMIT ?""",

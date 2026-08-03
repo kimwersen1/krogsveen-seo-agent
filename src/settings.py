@@ -78,6 +78,12 @@ class Settings:
         return self.config.get("varsel_terskler", {}).get("klikk_endring_pct", 20)
 
     @property
+    def klikk_min_volum(self) -> int:
+        """Minimum klikk (før eller etter) for at en prosentendring skal telle som avvik —
+        uten denne blir f.eks. 1→2 klikk vist som "+100 %", som er støy, ikke signal."""
+        return self.config.get("varsel_terskler", {}).get("klikk_min_volum", 10)
+
+    @property
     def gsc_oauth_configured(self) -> bool:
         return bool(self.google_oauth_client_id and self.google_oauth_client_secret and self.google_oauth_refresh_token)
 
