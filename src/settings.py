@@ -53,6 +53,10 @@ class Settings:
     google_oauth_refresh_token: str
     google_search_console_property: str
     google_ga4_property_id: str
+    google_gmail_address: str
+    google_gmail_app_password: str
+    weekly_report_email_recipient: str
+    weekly_report_dashboard_url: str
     gemini_api_key: str
     gemini_model: str
     perplexity_api_key: str
@@ -80,6 +84,13 @@ class Settings:
     @property
     def gsc_oauth_configured(self) -> bool:
         return bool(self.google_oauth_client_id and self.google_oauth_client_secret and self.google_oauth_refresh_token)
+
+    @property
+    def email_configured(self) -> bool:
+        # SMTP + app-passord, ikke Gmail API/OAuth — se src/report/email_sender.py for
+        # begrunnelse (unngår å legge enda en OAuth-scope-utvidelse oppå gsc_oauth.py/
+        # ga4_oauth.py sin allerede skjøre historie).
+        return bool(self.google_gmail_address and self.google_gmail_app_password)
 
     @property
     def ga4_configured(self) -> bool:
@@ -116,6 +127,15 @@ def load_settings() -> Settings:
         # Valgfritt — GA4 Data API for AI-referral-trafikk (chatgpt.com, claude.ai osv.),
         # gjenbruker samme OAuth-refresh-token som GSC (se ga4_configured over).
         google_ga4_property_id=_optional("GOOGLE_GA4_PROPERTY_ID"),
+        # Valgfritt — ukentlig e-postvarsel med lenker + Hovedbildet-sammendrag, se
+        # src/report/email_sender.py. Krever et Gmail-app-passord (2-trinns verifisering
+        # må være PÅ for avsenderkontoen), ikke OAuth.
+        google_gmail_address=_optional("GOOGLE_GMAIL_ADDRESS"),
+        google_gmail_app_password=_optional("GOOGLE_GMAIL_APP_PASSWORD"),
+        weekly_report_email_recipient=_optional("WEEKLY_REPORT_EMAIL_RECIPIENT"),
+        weekly_report_dashboard_url=_optional(
+            "WEEKLY_REPORT_DASHBOARD_URL", "https://kimwersen1.github.io/krogsveen-seo-agent/"
+        ),
         # Valgfrie — del av erstatningen for Ahrefs Brand Radar (21.07.2026), samme
         # mønster som ChatGPT-selvsjekken: hopper stille over seg selv uten nøkkel.
         gemini_api_key=_optional("GEMINI_API_KEY"),
