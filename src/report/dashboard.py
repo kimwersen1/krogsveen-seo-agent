@@ -24,7 +24,6 @@ def build_dashboard_payload(
     competitor_benchmark: list[dict],
     report_date: date,
     footprint_trend: list[dict] | None = None,
-    footprint_cluster_trend: list[dict] | None = None,
 ) -> dict:
     return {
         "generated": report_date.isoformat(),
@@ -34,8 +33,11 @@ def build_dashboard_payload(
         "site_metrics": analysis.get("site_metrics"),
         "gsc_site": analysis.get("gsc_site", []),
         "gsc_kilde": analysis.get("gsc_kilde", "ingen"),
+        # cluster_summaries og organisk_fotavtrykk brukes ikke lenger av HTML-dashboardet
+        # (fjernet 03.08.2026 — leste som generisk søkeordsstøy uten kobling til faktisk
+        # utført arbeid), men holdes i payloaden fordi build_sheet_payload under fortsatt
+        # bruker dem til Google Sheets-versjonen av dashboardet.
         "cluster_summaries": analysis.get("cluster_summaries", []),
-        "avvik": analysis.get("avvik", [])[:15],
         "geo": analysis.get("geo", {}),
         "tiltak": analysis.get("tiltak", []),
         "anbefaling": analysis.get("anbefaling", []),
@@ -45,7 +47,6 @@ def build_dashboard_payload(
         "position_trend": position_trend,
         "clicks_trend": clicks_trend,
         "footprint_trend": footprint_trend or [],
-        "footprint_cluster_trend": footprint_cluster_trend or [],
         "competitor_benchmark": competitor_benchmark,
     }
 
@@ -197,21 +198,10 @@ _TEMPLATE = r"""<!doctype html>
   td { font-variant-numeric: tabular-nums; }
   tr.self td { background: var(--accent-soft); font-weight: 600; }
   .table-scroll { overflow-x: auto; }
-  .cluster-row { display: grid; grid-template-columns: 100px 1fr 60px 150px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
-  .cluster-header { font-size: 11px; color: var(--ink-muted); border-bottom: 1px solid var(--line-strong); padding-bottom: 8px; font-weight: 600; }
-  .cluster-row:last-child { border-bottom: none; }
-  .cluster-name { font-weight: 600; }
-  .cluster-track { display: block; height: 7px; border-radius: 4px; background: var(--bg-surface-2); overflow: hidden; }
-  .cluster-track .fill { display: block; background: var(--accent); height: 100%; }
-  .cluster-count { text-align: right; color: var(--ink-muted); }
   .cluster-delta { text-align: right; font-weight: 600; }
   .cluster-delta.up { color: var(--good); }
   .cluster-delta.down { color: var(--critical); }
   .cluster-delta.flat { color: var(--ink-muted); }
-  .footprint-row { display: grid; grid-template-columns: 1fr 90px 90px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
-  .footprint-row:last-child { border-bottom: none; }
-  .footprint-row .name { font-weight: 600; }
-  .footprint-row .count, .footprint-row .pos { text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
   .geo-item { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
   .geo-item:last-child { margin-bottom: 0; }
   .geo-item-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 5px; }
@@ -289,32 +279,8 @@ _TEMPLATE = r"""<!doctype html>
   </div>
 
   <div class="card">
-    <h2>Synlighet per cluster over tid</h2>
-    <div class="card-sub" id="cluster-sub"></div>
-    <div class="cluster-row cluster-header">
-      <span>Cluster</span>
-      <span>Andel av total synlighet i topp 50</span>
-      <span style="text-align:right">Søkeord i topp 50</span>
-      <span style="text-align:right">Endring</span>
-    </div>
-    <div id="cluster-rows"></div>
-  </div>
-
-  <div class="card" id="avvik-card" style="display:none">
-    <h2>Avvik</h2>
-    <div class="card-sub">Søkeord med posisjonsendring &gt;3 plasser eller klikkendring &gt;20 % (minst 10 klikk i én av ukene, for å luke ut støy som "1→2 klikk = +100 %") — samme uke-mot-uke-data som ligger i rapporten, ikke bare cluster-snittet</div>
-    <div class="table-scroll"><table id="avvik-table"><thead><tr><th>Søkeord</th><th>Side</th><th>Type</th><th>Endring</th><th>Fra → til</th></tr></thead><tbody></tbody></table></div>
-  </div>
-
-  <div class="card">
-    <h2>Organisk fotavtrykk</h2>
-    <div class="card-sub" id="footprint-sub">Bredere enn de 338 sporede Rank Tracker-ordene — hele domenets synlige søkeord (topp 50 posisjon)</div>
-    <div id="footprint-rows"></div>
-  </div>
-
-  <div class="card">
-    <h2>Tiltaks-status</h2>
-    <div class="card-sub">Posisjon viser første → siste kjente uke per målord (mobil) — den samme kilden som resten av siden, ikke bare en statusetikett</div>
+    <h2>Effekt av arbeidet ditt</h2>
+    <div class="card-sub">Hvert tiltak i tiltak.json, med faktisk posisjon (mobil) første → siste kjente uke per målord — ikke bare en statusetikett</div>
     <div class="table-scroll"><table id="tiltak-table"><thead><tr><th>Side</th><th>Målord</th><th>Posisjon</th><th>Status</th><th>Uker aktiv</th></tr></thead><tbody></tbody></table></div>
   </div>
 
@@ -520,87 +486,6 @@ _TEMPLATE = r"""<!doctype html>
   var series2Color = getComputedStyle(document.body).getPropertyValue("--series-2").trim();
   renderTrendChart("position-chart", data.position_trend, "avg_position", series1Color, "Snittposisjon");
   renderTrendChart("clicks-chart", data.clicks_trend, "clicks", series2Color, "Klikk");
-
-  // ---- Cluster rows: synlighetsbredde (topp 50, hele domenet) per cluster, ikke
-  // uke-mot-uke posisjons-snittendring på de 338 sporede ordene — mer stabilt og
-  // lettere å tolke for markedsføring (erstattet Cluster-bevegelse 03.08.2026 etter
-  // brukertilbakemelding om at posisjons-snittet ga lite verdi). ----
-  var clusterWrap = document.getElementById("cluster-rows");
-  var footprintClusterRows = data.footprint_cluster_trend || [];
-  var totalFootprintClusters = footprintClusterRows.reduce(function (s, c) { return s + c.keyword_count; }, 0) || 1;
-  var clusterWeeksSpan = footprintClusterRows.length ? footprintClusterRows[0].weeks_span : 0;
-  document.getElementById("cluster-sub").textContent = clusterWeeksSpan
-    ? "Endring i antall søkeord i topp 50 siste " + clusterWeeksSpan + " uker, per cluster."
-    : "Antall søkeord i topp 50 denne uken, per cluster — for lite historikk ennå til å vise endring.";
-  footprintClusterRows.forEach(function (c) {
-    var row = document.createElement("div");
-    row.className = "cluster-row";
-    var share = (c.keyword_count / totalFootprintClusters) * 100;
-    var deltaClass = c.delta > 0 ? "up" : c.delta < 0 ? "down" : "flat";
-    var deltaLabel = c.delta > 0 ? "+" + c.delta + " søkeord" : c.delta < 0 ? c.delta + " søkeord" : "uendret";
-    row.innerHTML =
-      '<span class="cluster-name">' + c.name + '</span>' +
-      '<span class="cluster-track"><span class="fill" style="width:' + share.toFixed(1) + '%"></span></span>' +
-      '<span class="cluster-count">' + c.keyword_count + '</span>' +
-      '<span class="cluster-delta ' + deltaClass + '">' + deltaLabel + '</span>';
-    clusterWrap.appendChild(row);
-  });
-  if (!footprintClusterRows.length) {
-    clusterWrap.innerHTML = '<div style="padding:10px 0;color:var(--ink-muted);font-size:12.5px">Ingen data ennå.</div>';
-  }
-
-  // ---- Avvik ----
-  var avvikRows = data.avvik || [];
-  if (avvikRows.length) {
-    document.getElementById("avvik-card").style.display = "";
-    var avvikBody = document.querySelector("#avvik-table tbody");
-    avvikRows.forEach(function (a) {
-      var tr = document.createElement("tr");
-      var typeLabel, endring, endringClass, fraTil;
-      if (a.type === "posisjon") {
-        typeLabel = "Posisjon";
-        endringClass = a.delta > 0 ? "up" : "down";
-        endring = (a.delta > 0 ? "+" : "") + a.delta + " plasser";
-        fraTil = (a.position_prev != null ? a.position_prev : "–") + " → " + (a.position != null ? a.position : "–");
-      } else {
-        typeLabel = "Klikk";
-        endringClass = a.pct_change > 0 ? "up" : "down";
-        endring = (a.pct_change > 0 ? "+" : "") + a.pct_change + "%";
-        fraTil = fmt.format(a.clicks_prev || 0) + " → " + fmt.format(a.clicks || 0);
-      }
-      var sideCell = "–";
-      if (a.url) {
-        var displayPath = a.url.replace(/^https?:\/\/(www\.)?krogsveen\.no/, "") || "/";
-        sideCell = '<a href="' + a.url + '" target="_blank" rel="noopener" class="mono">' + displayPath + '</a>';
-      }
-      tr.innerHTML =
-        '<td class="mono">' + a.keyword + '</td>' +
-        '<td>' + sideCell + '</td>' +
-        '<td>' + typeLabel + '</td>' +
-        '<td class="cluster-delta ' + endringClass + '">' + endring + '</td>' +
-        '<td>' + fraTil + '</td>';
-      avvikBody.appendChild(tr);
-    });
-  }
-
-  // ---- Organisk fotavtrykk ----
-  var footprint = data.organisk_fotavtrykk || {};
-  var footprintWrap = document.getElementById("footprint-rows");
-  var footprintTotal = footprint.total_sokeord || 0;
-  document.getElementById("footprint-sub").textContent =
-    footprintTotal + " søkeord i topp 50 (hele domenet) — bredere enn de " + totalTracked + " sporede Rank Tracker-ordene";
-  (footprint.cluster_summary || []).forEach(function (c) {
-    var row = document.createElement("div");
-    row.className = "footprint-row";
-    row.innerHTML =
-      '<span class="name">' + c.name + '</span>' +
-      '<span class="count">' + c.keyword_count + ' søkeord</span>' +
-      '<span class="pos">' + (c.avg_position != null ? "pos " + c.avg_position : "–") + '</span>';
-    footprintWrap.appendChild(row);
-  });
-  if (!footprintTotal) {
-    footprintWrap.innerHTML = '<div class="empty-note">Ingen data denne uken (budsjett-hopp over eller første kjøring)</div>';
-  }
 
   // ---- GEO panel ----
   var geoPanel = document.getElementById("geo-panel");
