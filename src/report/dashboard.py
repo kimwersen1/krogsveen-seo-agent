@@ -294,6 +294,12 @@ _TEMPLATE = r"""<!doctype html>
     <div id="cluster-rows"></div>
   </div>
 
+  <div class="card" id="avvik-card" style="display:none">
+    <h2>Avvik</h2>
+    <div class="card-sub">Søkeord med posisjonsendring &gt;3 plasser eller klikkendring &gt;20 % — samme uke-mot-uke-data som ligger i rapporten, ikke bare cluster-snittet</div>
+    <div class="table-scroll"><table id="avvik-table"><thead><tr><th>Søkeord</th><th>Type</th><th>Endring</th><th>Fra → til</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
   <div class="card">
     <h2>Organisk fotavtrykk</h2>
     <div class="card-sub" id="footprint-sub">Bredere enn de 338 sporede Rank Tracker-ordene — hele domenets synlige søkeord (topp 50 posisjon)</div>
@@ -525,6 +531,34 @@ _TEMPLATE = r"""<!doctype html>
       '<span class="cluster-delta ' + deltaClass + '">' + deltaLabel + '</span>';
     clusterWrap.appendChild(row);
   });
+
+  // ---- Avvik ----
+  var avvikRows = data.avvik || [];
+  if (avvikRows.length) {
+    document.getElementById("avvik-card").style.display = "";
+    var avvikBody = document.querySelector("#avvik-table tbody");
+    avvikRows.forEach(function (a) {
+      var tr = document.createElement("tr");
+      var typeLabel, endring, endringClass, fraTil;
+      if (a.type === "posisjon") {
+        typeLabel = "Posisjon";
+        endringClass = a.delta > 0 ? "up" : "down";
+        endring = (a.delta > 0 ? "+" : "") + a.delta + " plasser";
+        fraTil = (a.position_prev != null ? a.position_prev : "–") + " → " + (a.position != null ? a.position : "–");
+      } else {
+        typeLabel = "Klikk";
+        endringClass = a.pct_change > 0 ? "up" : "down";
+        endring = (a.pct_change > 0 ? "+" : "") + a.pct_change + "%";
+        fraTil = fmt.format(a.clicks_prev || 0) + " → " + fmt.format(a.clicks || 0);
+      }
+      tr.innerHTML =
+        '<td class="mono">' + a.keyword + '</td>' +
+        '<td>' + typeLabel + '</td>' +
+        '<td class="cluster-delta ' + endringClass + '">' + endring + '</td>' +
+        '<td>' + fraTil + '</td>';
+      avvikBody.appendChild(tr);
+    });
+  }
 
   // ---- Organisk fotavtrykk ----
   var footprint = data.organisk_fotavtrykk || {};
