@@ -290,10 +290,12 @@ def run_pipeline(
     ai_overview_keywords = geo_analysis.keywords_with_ai_overview(tagged_mobile)
 
     history_rows_all = storage.get_history(conn, "rank_tracker_weekly", weeks=8)
-    history_rows = [r for r in history_rows_all if r.get("device") == "mobile"]
-    tiltak_status = tiltak_analysis.classify_all(settings.tiltak, history_rows, today)
+    history_rows_mobil = [r for r in history_rows_all if r.get("device") == "mobile"]
+    history_rows_desktop = [r for r in history_rows_all if r.get("device") == "desktop"]
+    tiltak_status = tiltak_analysis.classify_all(settings.tiltak, history_rows_mobil, history_rows_desktop, today)
 
-    position_trend = storage.get_position_trend(conn, weeks=12)
+    position_trend = storage.get_position_trend(conn, weeks=12, device="mobile")
+    position_trend_desktop = storage.get_position_trend(conn, weeks=12, device="desktop")
     clicks_trend = storage.get_clicks_trend(conn, weeks=12)
 
     tagged_footprint = cluster_analysis.tag_rows(footprint_rows, settings.clusters)
@@ -346,7 +348,7 @@ def run_pipeline(
     title = report_title(today)
 
     dashboard_payload = build_dashboard_payload(
-        analysis, position_trend, clicks_trend, competitor_benchmark, today, footprint_trend
+        analysis, position_trend, clicks_trend, competitor_benchmark, today, footprint_trend, position_trend_desktop
     )
     dashboard_path = render_dashboard(dashboard_payload)
 

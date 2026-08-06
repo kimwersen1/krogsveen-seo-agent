@@ -33,9 +33,14 @@ def _malord_posisjoner(history_rows: list[dict], malord: set[str]) -> list[dict]
     return result
 
 
-def classify_tiltak(tiltak: dict, history_rows: list[dict], today: date) -> dict:
-    """history_rows: rank_tracker_weekly-rader, forventes forhåndsfiltrert til én enhet
-    (mobil — se pipeline.py) slik at posisjonstallene er sammenlignbare uke mot uke."""
+def classify_tiltak(
+    tiltak: dict, history_rows_mobil: list[dict], history_rows_desktop: list[dict], today: date
+) -> dict:
+    """history_rows_mobil/history_rows_desktop: rank_tracker_weekly-rader, hver forhånds-
+    filtrert til én enhet, slik at posisjonstallene er sammenlignbare uke mot uke. Status-
+    vurderingen (bekreftet effekt / avventer / osv.) beregnes fra mobil alene — samme
+    primærkilde som resten av analysen — men begge enheters posisjoner vises, siden mobil
+    og desktop kan bevege seg i hver sin retning for samme søkeord (se CLAUDE.md/diffs.py)."""
     dato = tiltak.get("dato")
     malord = {m.lower() for m in tiltak.get("malord", [])}
 
@@ -48,7 +53,8 @@ def classify_tiltak(tiltak: dict, history_rows: list[dict], today: date) -> dict
         return {**tiltak, "status_vurdering": "ikke_vurdert"}
 
     weeks_active = max((today - start).days // 7, 0)
-    malord_posisjoner = _malord_posisjoner(history_rows, malord)
+    malord_posisjoner = _malord_posisjoner(history_rows_mobil, malord)
+    malord_posisjoner_desktop = _malord_posisjoner(history_rows_desktop, malord)
 
     # Snitt av per-målord-delta (positivt = forbedring), ikke rå rader blandet på tvers
     # av søkeord — se docstring i _malord_posisjoner for hvorfor.
@@ -74,8 +80,11 @@ def classify_tiltak(tiltak: dict, history_rows: list[dict], today: date) -> dict
         "uker_aktiv": weeks_active,
         "status_vurdering": vurdering,
         "malord_posisjoner": malord_posisjoner,
+        "malord_posisjoner_desktop": malord_posisjoner_desktop,
     }
 
 
-def classify_all(tiltak_list: list[dict], history_rows: list[dict], today: date) -> list[dict]:
-    return [classify_tiltak(t, history_rows, today) for t in tiltak_list]
+def classify_all(
+    tiltak_list: list[dict], history_rows_mobil: list[dict], history_rows_desktop: list[dict], today: date
+) -> list[dict]:
+    return [classify_tiltak(t, history_rows_mobil, history_rows_desktop, today) for t in tiltak_list]

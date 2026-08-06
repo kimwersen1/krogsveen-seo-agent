@@ -38,8 +38,11 @@ REPORT_FORMAT = """
       (alltid 28) forteller hvor mange dager tallene faktisk dekker. Omtal det eksplisitt
       som "siste 28 dager" (eller tilsvarende), aldri som "denne uken" — lavvolum-tallene
       her blir ustabile/misvisende over en enkelt uke, derfor det lengre vinduet.
-4. Tiltaks-effekt. Hvert tiltak har malord_posisjoner (første → siste kjente posisjon per
-   målord) — bruk faktiske tall her ("boligverdi: 8→3"), ikke bare statusetiketten.
+4. Tiltaks-effekt. Hvert tiltak har malord_posisjoner (mobil, første → siste kjente posisjon
+   per målord — status_vurdering er også basert på denne) og malord_posisjoner_desktop
+   (samme, desktop) — bruk faktiske tall her ("boligverdi: mobil 8→3"), ikke bare
+   statusetiketten. Nevn desktop-tallet spesifikt kun når det peker en annen vei enn mobil
+   (reelt avvik verdt å flagge), ikke rutinemessig for hvert tiltak.
 5. Avvik (>3 pos / >20 % klikk). Posisjonsavvik har et url-felt — nevn siden når den er
    kjent, ikke bare søkeordet, slik at avviket kan knyttes til en konkret side dere har
    jobbet med. Klikkavvik mangler url (GSC sin query-dimensjon gir ikke side per søkeord)

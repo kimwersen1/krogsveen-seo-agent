@@ -24,6 +24,7 @@ def build_dashboard_payload(
     competitor_benchmark: list[dict],
     report_date: date,
     footprint_trend: list[dict] | None = None,
+    position_trend_desktop: list[dict] | None = None,
 ) -> dict:
     return {
         "generated": report_date.isoformat(),
@@ -45,6 +46,7 @@ def build_dashboard_payload(
         "organisk_fotavtrykk": analysis.get("organisk_fotavtrykk", {}),
         "datamangler": analysis.get("datamangler", []),
         "position_trend": position_trend,
+        "position_trend_desktop": position_trend_desktop or [],
         "clicks_trend": clicks_trend,
         "footprint_trend": footprint_trend or [],
         "competitor_benchmark": competitor_benchmark,
@@ -120,7 +122,7 @@ _TEMPLATE = r"""<!doctype html>
     --line: #D9DCD0; --line-strong: #C3C7B7;
     --accent: #0C8A75; --accent-soft: #DCEAE5;
     --brass: #8A5E17;
-    --series-1: #0C8A75; --series-2: #b8791f;
+    --series-1: #0C8A75; --series-2: #b8791f; --series-3: #8B93A6;
     --good: #0ca30c; --good-soft: #DCF0DA;
     --warning: #9a6a00; --warning-soft: #FBE9C4;
     --critical: #b23327; --critical-soft: #F8DFDA;
@@ -133,7 +135,7 @@ _TEMPLATE = r"""<!doctype html>
       --line: #2B2F24; --line-strong: #3A3F30;
       --accent: #4CB59D; --accent-soft: #1C2B24;
       --brass: #D9A857;
-      --series-1: #2E9A84; --series-2: #B4823F;
+      --series-1: #2E9A84; --series-2: #B4823F; --series-3: #7C859C;
       --good: #4CAE55; --good-soft: #16281A;
       --warning: #D9A857; --warning-soft: #322A15;
       --critical: #E08277; --critical-soft: #301917;
@@ -145,7 +147,7 @@ _TEMPLATE = r"""<!doctype html>
     --ink: #ECEADF; --ink-2: #C3C7B4; --ink-muted: #8B9080;
     --line: #2B2F24; --line-strong: #3A3F30;
     --accent: #4CB59D; --accent-soft: #1C2B24; --brass: #D9A857;
-    --series-1: #2E9A84; --series-2: #B4823F;
+    --series-1: #2E9A84; --series-2: #B4823F; --series-3: #7C859C;
     --good: #4CAE55; --good-soft: #16281A;
     --warning: #D9A857; --warning-soft: #322A15;
     --critical: #E08277; --critical-soft: #301917;
@@ -156,7 +158,7 @@ _TEMPLATE = r"""<!doctype html>
     --ink: #14170F; --ink-2: #4B5147; --ink-muted: #83887C;
     --line: #D9DCD0; --line-strong: #C3C7B7;
     --accent: #0C8A75; --accent-soft: #DCEAE5; --brass: #8A5E17;
-    --series-1: #0C8A75; --series-2: #b8791f;
+    --series-1: #0C8A75; --series-2: #b8791f; --series-3: #8B93A6;
     --good: #0ca30c; --good-soft: #DCF0DA;
     --warning: #9a6a00; --warning-soft: #FBE9C4;
     --critical: #b23327; --critical-soft: #F8DFDA;
@@ -262,7 +264,7 @@ _TEMPLATE = r"""<!doctype html>
   <div class="two-col">
     <div class="card">
       <h2>Snittposisjon over tid</h2>
-      <div class="card-sub" id="position-chart-sub">Alle sporede søkeord, mobil (~70 % av søkevolumet)</div>
+      <div class="card-sub" id="position-chart-sub">Alle sporede søkeord — mobil (~70 % av søkevolumet, primærkilde ellers på siden) og desktop</div>
       <div id="position-chart"></div>
     </div>
     <div class="card">
@@ -280,7 +282,7 @@ _TEMPLATE = r"""<!doctype html>
 
   <div class="card">
     <h2>Effekt av arbeidet ditt</h2>
-    <div class="card-sub">Hvert tiltak i tiltak.json, med faktisk posisjon (mobil) første → siste kjente uke per målord — ikke bare en statusetikett</div>
+    <div class="card-sub">Hvert tiltak i tiltak.json, med faktisk posisjon (mobil og desktop) første → siste kjente uke per målord — ikke bare en statusetikett. Status beregnes fra mobil, primærkilden ellers på siden.</div>
     <div class="table-scroll"><table id="tiltak-table"><thead><tr><th>Side</th><th>Målord</th><th>Posisjon</th><th>Status</th><th>Uker aktiv</th></tr></thead><tbody></tbody></table></div>
   </div>
 
@@ -369,7 +371,7 @@ _TEMPLATE = r"""<!doctype html>
     var posDiff = oldestPos - newestPos; // positivt = forbedring (lavere posisjon er bedre)
     var posLabel = posDiff > 0.05 ? "bedre" : (posDiff < -0.05 ? "svakere" : "uendret");
     posSubEl.textContent =
-      "Alle sporede søkeord, mobil (~70 % av søkevolumet) — " +
+      "Alle sporede søkeord — mobil (~70 % av søkevolumet, primærkilde ellers på siden) og desktop — mobil " +
       Math.abs(posDiff).toFixed(1) + " plasser " + posLabel + " siste " + (posTrend.length - 1) + " uker.";
   }
 
@@ -430,22 +432,29 @@ _TEMPLATE = r"""<!doctype html>
     aiList.innerHTML = '<div class="empty-note">Ingen søkeord med AI Overview denne uken</div>';
   }
 
-  // ---- Trend charts (single-series, simple) ----
-  function renderTrendChart(containerId, points, valueKey, color, label) {
+  // ---- Trend charts. Tar en liste av serier (points/color/label) i stedet for én, slik
+  // at Snittposisjon-grafen kan vise mobil OG desktop side ved side — bruker ba om dette
+  // 03.08.2026 fordi mobil-only skjuler akkurat den typen avvik (desktop ↔ mobil motsatt
+  // retning) som var grunnen til at vi byttet primærkilde til mobil i utgangspunktet. ----
+  function renderTrendChart(containerId, seriesList, valueKey) {
     var container = document.getElementById(containerId);
-    if (!points || points.length < 2) {
-      container.innerHTML = '<div class="empty-note">Bygger historikk — for få uker med data ennå (' + (points ? points.length : 0) + ' registrert)</div>';
+    seriesList = (seriesList || []).filter(function (s) { return s.points && s.points.length; });
+    if (!seriesList.length || seriesList[0].points.length < 2) {
+      var n = seriesList.length ? seriesList[0].points.length : 0;
+      container.innerHTML = '<div class="empty-note">Bygger historikk — for få uker med data ennå (' + n + ' registrert)</div>';
       return;
     }
+    var weeks = seriesList[0].points.map(function (p) { return p.week_start; });
     var W = 420, H = 160, M = { top: 10, right: 10, bottom: 24, left: 44 };
     var plotW = W - M.left - M.right, plotH = H - M.top - M.bottom;
-    var values = points.map(function (p) { return p[valueKey]; });
-    var minV = Math.min.apply(null, values), maxV = Math.max.apply(null, values);
+    var allValues = [];
+    seriesList.forEach(function (s) { s.points.forEach(function (p) { allValues.push(p[valueKey]); }); });
+    var minV = Math.min.apply(null, allValues), maxV = Math.max.apply(null, allValues);
     if (minV === maxV) { minV -= 1; maxV += 1; }
     var pad = (maxV - minV) * 0.15;
     minV -= pad; maxV += pad;
 
-    function x(i) { return M.left + (plotW * i) / (points.length - 1); }
+    function x(i) { return M.left + (plotW * i) / (weeks.length - 1); }
     function y(v) { return M.top + plotH - (plotH * (v - minV)) / (maxV - minV); }
 
     var svg = document.createElementNS(svgNS, "svg");
@@ -465,27 +474,55 @@ _TEMPLATE = r"""<!doctype html>
       text.textContent = valueKey === "avg_position" ? v.toFixed(1) : fmt.format(Math.round(v));
       svg.appendChild(text);
     });
-    var d = points.map(function (p, i) { return (i === 0 ? "M" : "L") + x(i) + "," + y(p[valueKey]); }).join(" ");
-    var path = document.createElementNS(svgNS, "path");
-    path.setAttribute("d", d); path.setAttribute("class", "series-line"); path.setAttribute("stroke", color);
-    svg.appendChild(path);
-    points.forEach(function (p, i) {
-      var c = document.createElementNS(svgNS, "circle");
-      c.setAttribute("cx", x(i)); c.setAttribute("cy", y(p[valueKey])); c.setAttribute("r", 3.5);
-      c.setAttribute("fill", color); c.setAttribute("class", "series-dot");
-      svg.appendChild(c);
+    seriesList.forEach(function (s) {
+      var byWeek = {};
+      s.points.forEach(function (p) { byWeek[p.week_start] = p; });
+      var d = "", started = false;
+      weeks.forEach(function (w, i) {
+        var p = byWeek[w];
+        if (!p || p[valueKey] == null) { started = false; return; }
+        d += (started ? "L" : "M") + x(i) + "," + y(p[valueKey]) + " ";
+        started = true;
+      });
+      var path = document.createElementNS(svgNS, "path");
+      path.setAttribute("d", d.trim()); path.setAttribute("class", "series-line"); path.setAttribute("stroke", s.color);
+      svg.appendChild(path);
+      weeks.forEach(function (w, i) {
+        var p = byWeek[w];
+        if (!p || p[valueKey] == null) return;
+        var c = document.createElementNS(svgNS, "circle");
+        c.setAttribute("cx", x(i)); c.setAttribute("cy", y(p[valueKey])); c.setAttribute("r", 3.5);
+        c.setAttribute("fill", s.color); c.setAttribute("class", "series-dot");
+        svg.appendChild(c);
+      });
+    });
+    weeks.forEach(function (w, i) {
       var lbl = document.createElementNS(svgNS, "text");
       lbl.setAttribute("x", x(i)); lbl.setAttribute("y", H - M.bottom + 14);
       lbl.setAttribute("class", "axis-text"); lbl.setAttribute("text-anchor", "middle");
-      lbl.textContent = (p.week_start || "").slice(5);
+      lbl.textContent = (w || "").slice(5);
       svg.appendChild(lbl);
     });
     container.appendChild(svg);
+    if (seriesList.length > 1) {
+      var legend = document.createElement("div");
+      legend.style.cssText = "display:flex;gap:14px;font-size:11.5px;color:var(--ink-muted);margin-top:4px;";
+      seriesList.forEach(function (s) {
+        var item = document.createElement("span");
+        item.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + s.color + ';margin-right:5px;"></span>' + s.label;
+        legend.appendChild(item);
+      });
+      container.appendChild(legend);
+    }
   }
   var series1Color = getComputedStyle(document.body).getPropertyValue("--series-1").trim();
   var series2Color = getComputedStyle(document.body).getPropertyValue("--series-2").trim();
-  renderTrendChart("position-chart", data.position_trend, "avg_position", series1Color, "Snittposisjon");
-  renderTrendChart("clicks-chart", data.clicks_trend, "clicks", series2Color, "Klikk");
+  var series3Color = getComputedStyle(document.body).getPropertyValue("--series-3").trim();
+  renderTrendChart("position-chart", [
+    { points: data.position_trend, color: series1Color, label: "Mobil" },
+    { points: data.position_trend_desktop, color: series3Color, label: "Desktop" }
+  ], "avg_position");
+  renderTrendChart("clicks-chart", [{ points: data.clicks_trend, color: series2Color, label: "Klikk" }], "clicks");
 
   // ---- GEO panel ----
   var geoPanel = document.getElementById("geo-panel");
@@ -563,12 +600,15 @@ _TEMPLATE = r"""<!doctype html>
   (data.tiltak || []).forEach(function (t) {
     var statusKey = STATUS_CLASS[t.status_vurdering] || "ikke_vurdert";
     var tr = document.createElement("tr");
-    var posisjonHtml = (t.malord_posisjoner || []).map(function (mp) {
-      if (mp.posisjon_forst == null || mp.posisjon_sist == null) {
-        return mp.malord + ": –";
-      }
+    var desktopByMalord = {};
+    (t.malord_posisjoner_desktop || []).forEach(function (mp) { desktopByMalord[mp.malord] = mp; });
+    function fmtDevicePos(mp) {
+      if (!mp || mp.posisjon_forst == null || mp.posisjon_sist == null) return "–";
       var cls = mp.posisjon_sist < mp.posisjon_forst ? "up" : (mp.posisjon_sist > mp.posisjon_forst ? "down" : "flat");
-      return mp.malord + ': <span class="cluster-delta ' + cls + '">' + mp.posisjon_forst + " → " + mp.posisjon_sist + '</span>';
+      return '<span class="cluster-delta ' + cls + '">' + mp.posisjon_forst + " → " + mp.posisjon_sist + '</span>';
+    }
+    var posisjonHtml = (t.malord_posisjoner || []).map(function (mp) {
+      return mp.malord + ": mobil " + fmtDevicePos(mp) + " · desktop " + fmtDevicePos(desktopByMalord[mp.malord]);
     }).join("<br>") || "–";
     tr.innerHTML =
       '<td class="mono">' + (t.side || "") + '</td>' +

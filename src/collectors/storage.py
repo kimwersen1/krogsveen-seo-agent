@@ -318,18 +318,20 @@ def get_content_briefs_meta(conn: sqlite3.Connection) -> dict | None:
     return {"url": row[0], "updated_at": row[1], "antall_forslag": row[2]}
 
 
-def get_position_trend(conn: sqlite3.Connection, weeks: int = 12) -> list[dict]:
-    """Snitt-posisjon (mobil — ~70 % av søkevolumet, se CLAUDE.md) per uke på tvers av
-    alle sporede søkeord — for dashboard-trendgraf. Byttet fra desktop 03.08.2026: desktop
-    har mange null-posisjoner og kan vise motsatt trend av mobil for samme søkeord."""
+def get_position_trend(conn: sqlite3.Connection, weeks: int = 12, device: str = "mobile") -> list[dict]:
+    """Snitt-posisjon per uke på tvers av alle sporede søkeord — for dashboard-trendgraf.
+    Mobil (~70 % av søkevolumet, se CLAUDE.md) er primærkilden overalt ellers i analysen
+    (byttet fra desktop 03.08.2026 — desktop har mange null-posisjoner og kan vise motsatt
+    trend av mobil for samme søkeord), men dashboardet viser nå begge enhetene side ved
+    side i selve grafen slik at et slikt avvik er synlig i stedet for skjult."""
     cur = conn.execute(
         """SELECT week_start, AVG(position) as avg_position, COUNT(*) as n
            FROM rank_tracker_weekly
-           WHERE device = 'mobile' AND position IS NOT NULL
+           WHERE device = ? AND position IS NOT NULL
            GROUP BY week_start
            ORDER BY week_start DESC
            LIMIT ?""",
-        (weeks,),
+        (device, weeks),
     )
     rows = [{"week_start": w, "avg_position": round(p, 2), "n": n} for w, p, n in cur.fetchall()]
     return list(reversed(rows))
