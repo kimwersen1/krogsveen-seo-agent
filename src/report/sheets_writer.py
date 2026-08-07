@@ -13,6 +13,7 @@ Ark-struktur (opprettes/verifiseres ved første kjøring):
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -294,3 +295,53 @@ def _create_trend_charts(sheets_api, spreadsheet_id: str, dashboard_sheet_id: in
         line_chart("GSC-klikk over tid", 2, {"offsetY": 280}),
     ]
     sheets_api.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body={"requests": requests_}).execute()
+
+
+def write_query_export(settings: Settings, spreadsheet_id: str, rows: list[dict], sheet_title: str = "GSC Query Export") -> str:
+    """Skriver rullerende 90-dagers GSC query-nivå-eksport (klikk/visninger/CTR/posisjon
+    per søkeord — se src/collectors/gsc_oauth.get_query_performance_paginated) til et
+    separat, delt Sheet Google Ads-siden (Ole/Spira Nova) leser fra — SEO×Ads-synergi-
+    prosjektet, avtalt 06.08.2026. Overskriver hele arket hver kjøring (rullerende vindu,
+    ikke voksende historikk, i motsetning til 'Historikk'-fanen over)."""
+    creds = _credentials(settings)
+    sheets_api = build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+    spreadsheet = sheets_api.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    sheet_id_num = _sheet_id_by_title(spreadsheet, sheet_title)
+    if sheet_id_num is None:
+        default_sheet = spreadsheet["sheets"][0]["properties"]
+        if len(spreadsheet["sheets"]) == 1 and default_sheet["title"] != sheet_title:
+            sheets_api.spreadsheets().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body={
+                    "requests": [
+                        {
+                            "updateSheetProperties": {
+                                "properties": {"sheetId": default_sheet["sheetId"], "title": sheet_title},
+                                "fields": "title",
+                            }
+                        }
+                    ]
+                },
+            ).execute()
+        else:
+            sheets_api.spreadsheets().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body={"requests": [{"addSheet": {"properties": {"title": sheet_title}}}]},
+            ).execute()
+
+    header = ["query", "clicks", "impressions", "ctr_pct", "avg_position", "oppdatert"]
+    today_str = date.today().isoformat()
+    data_rows = [
+        [r["query"], r["clicks"], r["impressions"], r["ctr"], r["position"], today_str] for r in rows
+    ]
+
+    sheets_api.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range=f"'{sheet_title}'!A:Z").execute()
+    sheets_api.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=f"'{sheet_title}'!A1",
+        valueInputOption="RAW",
+        body=_values([header] + data_rows),
+    ).execute()
+    logger.info("SEO×Ads synergi: %d query-rader skrevet til Sheet %s", len(data_rows), spreadsheet_id)
+    return f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"

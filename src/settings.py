@@ -53,6 +53,7 @@ class Settings:
     google_oauth_refresh_token: str
     google_search_console_property: str
     google_ga4_property_id: str
+    google_ads_synergy_sheet_id: str
     gemini_api_key: str
     gemini_model: str
     perplexity_api_key: str
@@ -95,6 +96,13 @@ class Settings:
         # se scripts/gsc_auth_setup.py.
         return self.gsc_oauth_configured and bool(self.google_ga4_property_id)
 
+    @property
+    def ads_synergy_export_configured(self) -> bool:
+        """SEO×Ads-synergi: rullerende 90-dagers GSC-søkeord-eksport til et delt Sheet
+        Google Ads-siden (Ole/Spira Nova) leser fra. Bruker samme GSC OAuth-tilgang som
+        resten av GSC-integrasjonen; kun sheet-ID-en er spesifikk for denne eksporten."""
+        return self.gsc_oauth_configured and bool(self.google_ads_synergy_sheet_id)
+
 
 def load_settings() -> Settings:
     return Settings(
@@ -122,6 +130,9 @@ def load_settings() -> Settings:
         # Valgfritt — GA4 Data API for AI-referral-trafikk (chatgpt.com, claude.ai osv.),
         # gjenbruker samme OAuth-refresh-token som GSC (se ga4_configured over).
         google_ga4_property_id=_optional("GOOGLE_GA4_PROPERTY_ID"),
+        # Valgfritt — se ads_synergy_export_configured. Google Sheet delt med
+        # seo-agent@krogsveen-seo-agent.iam.gserviceaccount.com (via arv fra en delt mappe).
+        google_ads_synergy_sheet_id=_optional("GOOGLE_ADS_SYNERGY_SHEET_ID"),
         # Valgfrie — del av erstatningen for Ahrefs Brand Radar (21.07.2026), samme
         # mønster som ChatGPT-selvsjekken: hopper stille over seg selv uten nøkkel.
         gemini_api_key=_optional("GEMINI_API_KEY"),

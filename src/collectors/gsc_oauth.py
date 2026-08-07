@@ -74,6 +74,49 @@ def get_query_performance(settings: Settings, date_from: str, date_to: str, row_
     return _query(settings, date_from, date_to, "query", row_limit)
 
 
+def get_query_performance_paginated(
+    settings: Settings, date_from: str, date_to: str, max_rows: int = 25000, page_size: int = 5000
+) -> list[dict]:
+    """Som get_query_performance, men med startRow-paginering forbi enkelt-kalls-grensen —
+    et 90-dagers uttrekk for en reell nettside kan lett passere 1000 rader (se
+    get_query_performance sin faste row_limit), i motsetning til den ukentlige rapportens
+    338 sporede ord. Brukt til SEO×Ads-synergi-eksporten (se sheets_writer.py), ikke til
+    ukesrapporten selv."""
+    creds = _credentials(settings)
+    service = build("webmasters", "v3", credentials=creds, cache_discovery=False)
+    rows: list[dict] = []
+    start_row = 0
+    while len(rows) < max_rows:
+        body = {
+            "startDate": date_from,
+            "endDate": date_to,
+            "dimensions": ["query"],
+            "rowLimit": page_size,
+            "startRow": start_row,
+        }
+        response = (
+            service.searchanalytics().query(siteUrl=settings.google_search_console_property, body=body).execute()
+        )
+        page = response.get("rows", [])
+        if not page:
+            break
+        for row in page:
+            rows.append(
+                {
+                    "query": row["keys"][0],
+                    "clicks": int(row.get("clicks", 0)),
+                    "impressions": int(row.get("impressions", 0)),
+                    "ctr": round(row.get("ctr", 0.0) * 100, 4),
+                    "position": round(row.get("position", 0.0), 4),
+                }
+            )
+        if len(page) < page_size:
+            break
+        start_row += page_size
+    logger.info("GSC OAuth: %d query-rader paginert (%s -> %s)", len(rows), date_from, date_to)
+    return rows
+
+
 def get_page_performance(settings: Settings, date_from: str, date_to: str, row_limit: int = 1000) -> list[dict]:
     """Klikk/CTR/posisjon per side — direkte erstatning for gsc.import_gsc_export(dimension='page')."""
     return _query(settings, date_from, date_to, "page", row_limit)

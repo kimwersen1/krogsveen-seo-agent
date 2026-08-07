@@ -18,7 +18,7 @@ from src.collectors import ahrefs, chatgpt_geo, claude_geo, ga4_oauth, gemini_ge
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
 from src.report.generate import extract_recommendations, generate_report
-from src.report.sheets_writer import DashboardSheetNotFound, update_dashboard_sheet
+from src.report.sheets_writer import DashboardSheetNotFound, update_dashboard_sheet, write_query_export
 from src.settings import Settings, load_settings
 
 logger = logging.getLogger(__name__)
@@ -374,5 +374,21 @@ def run_pipeline(
             # skal aldri få hele kjøringen til å se ut som en fiasko i loggen/exit-koden.
             logger.warning("Dashboard-arket kunne ikke oppdateres denne uken: %s", e)
             data_gaps.append(f"Dashboard-ark (Google Sheets) ble ikke oppdatert denne uken: {e}")
+
+        # SEO×Ads-synergi: rullerende 90-dagers GSC-søkeord-eksport til et delt Sheet Ads-
+        # siden (Ole/Spira Nova) leser fra — se samtale 06.08.2026. Overskriver hele arket
+        # hvert kjøring (rullerende vindu, ikke voksende historikk). Valgfritt — hopper
+        # stille over hvis sheet-ID ikke er konfigurert, akkurat som GA4/e-post.
+        if settings.ads_synergy_export_configured:
+            try:
+                synergy_date_to = today - timedelta(days=1)
+                synergy_date_from = synergy_date_to - timedelta(days=89)
+                synergy_rows = gsc_oauth.get_query_performance_paginated(
+                    settings, synergy_date_from.isoformat(), synergy_date_to.isoformat()
+                )
+                write_query_export(settings, settings.google_ads_synergy_sheet_id, synergy_rows)
+            except HttpError as e:
+                logger.warning("SEO×Ads synergi-eksport feilet denne uken: %s", e)
+                data_gaps.append(f"SEO×Ads synergi Sheet-eksport feilet denne uken ({e}).")
 
     return result

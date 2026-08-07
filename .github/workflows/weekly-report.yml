@@ -55,6 +55,9 @@ jobs:
           # Valgfritt — AI-referral-trafikk via GA4 Data API (samme OAuth-token som over,
           # utvidet med analytics.readonly-scope 29.07.2026). Se src/collectors/ga4_oauth.py.
           GOOGLE_GA4_PROPERTY_ID: ${{ secrets.GOOGLE_GA4_PROPERTY_ID }}
+          # Valgfritt — SEO×Ads-synergi Sheet-eksport, se src/report/sheets_writer.py:
+          # write_query_export(). Krever samme OAuth-token som over (GSC-lesing).
+          GOOGLE_ADS_SYNERGY_SHEET_ID: ${{ secrets.GOOGLE_ADS_SYNERGY_SHEET_ID }}
           # GOOGLE_SEARCH_CONSOLE_PROPERTY er IKKE satt her med vilje — standardverdien i
           # settings.py (sc-domain:krogsveen.no) er riktig, og en GitHub-secret som ikke
           # finnes ville satt env-variabelen til en tom streng (ikke "usatt"), som
