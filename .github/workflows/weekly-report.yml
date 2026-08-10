@@ -58,6 +58,11 @@ jobs:
           # Valgfritt — SEO×Ads-synergi Sheet-eksport, se src/report/sheets_writer.py:
           # write_query_export(). Krever samme OAuth-token som over (GSC-lesing).
           GOOGLE_ADS_SYNERGY_SHEET_ID: ${{ secrets.GOOGLE_ADS_SYNERGY_SHEET_ID }}
+          # Valgfritt — ukentlig e-postvarsel via Gmail SMTP (app-passord, ikke OAuth).
+          # Se src/report/email_sender.py.
+          GOOGLE_GMAIL_ADDRESS: ${{ secrets.GOOGLE_GMAIL_ADDRESS }}
+          GOOGLE_GMAIL_APP_PASSWORD: ${{ secrets.GOOGLE_GMAIL_APP_PASSWORD }}
+          WEEKLY_REPORT_EMAIL_RECIPIENT: ${{ secrets.WEEKLY_REPORT_EMAIL_RECIPIENT }}
           # GOOGLE_SEARCH_CONSOLE_PROPERTY er IKKE satt her med vilje — standardverdien i
           # settings.py (sc-domain:krogsveen.no) er riktig, og en GitHub-secret som ikke
           # finnes ville satt env-variabelen til en tom streng (ikke "usatt"), som

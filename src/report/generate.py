@@ -54,3 +54,14 @@ def extract_recommendations(report_markdown: str) -> list[str]:
     # Dashboards viser disse som ren tekst (ikke Docs rich-text som drive_writer.py
     # håndterer separat) — fjern **bold**-markører i stedet for å vise dem bokstavelig.
     return [re.sub(r"\*\*(.+?)\*\*", r"\1", b).strip() for b in bullets if b.strip()]
+
+
+def extract_hovedbildet(report_markdown: str) -> str:
+    """Plukker ut avsnittet under seksjon 1 ("Hovedbildet") som ren tekst, til bruk i
+    e-postsammendraget (src/report/email_sender.py) — samme mønster som
+    extract_recommendations over, men henter et avsnitt i stedet for en punktliste."""
+    match = re.search(r"^##\s*1\..*?$(.*?)(?=^##\s*\d|\Z)", report_markdown, re.MULTILINE | re.DOTALL)
+    if not match:
+        return ""
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", match.group(1)).strip()
+    return re.sub(r"\n{2,}", " ", text).strip()

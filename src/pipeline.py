@@ -17,7 +17,8 @@ from src.analysis import tiltak as tiltak_analysis
 from src.collectors import ahrefs, chatgpt_geo, claude_geo, ga4_oauth, gemini_geo, gsc, gsc_oauth, perplexity_geo, storage
 from src.report.dashboard import build_dashboard_payload, build_sheet_payload, render_dashboard
 from src.report.drive_writer import prepend_report_section, report_title
-from src.report.generate import extract_recommendations, generate_report
+from src.report.email_sender import send_weekly_report_email
+from src.report.generate import extract_hovedbildet, extract_recommendations, generate_report
 from src.report.sheets_writer import DashboardSheetNotFound, update_dashboard_sheet, write_query_export
 from src.settings import Settings, load_settings
 
@@ -390,5 +391,18 @@ def run_pipeline(
             except HttpError as e:
                 logger.warning("SEO×Ads synergi-eksport feilet denne uken: %s", e)
                 data_gaps.append(f"SEO×Ads synergi Sheet-eksport feilet denne uken ({e}).")
+
+        if settings.email_configured:
+            try:
+                send_weekly_report_email(
+                    settings,
+                    title,
+                    result["report_url"],
+                    result["sheet_url"],
+                    extract_hovedbildet(report_markdown),
+                )
+            except Exception as e:  # smtplib kaster flere ulike feiltyper (auth, tilkobling, timeout)
+                logger.warning("Ukesrapport-e-post kunne ikke sendes denne uken: %s", e)
+                data_gaps.append(f"Ukesrapport-e-post ble ikke sendt denne uken: {e}")
 
     return result
