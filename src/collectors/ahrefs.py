@@ -159,6 +159,33 @@ def get_site_metrics(settings: Settings, date: str, target: str = "krogsveen.no"
     return data["metrics"]
 
 
+def get_ai_responses_count(settings: Settings, date: str, target: str = "krogsveen.no") -> dict:
+    """site-explorer/ai-responses-count — domenevidt antall siteringer av target i AI-
+    plattformers svar (google_ai_overviews_keywords, google_ai_mode, chatgpt, gemini,
+    perplexity, copilot, grok), UAVHENGIG av de 338 manuelt sporede Rank Tracker-ordene.
+
+    Ny Ahrefs-funksjon (bekreftet "New index"-merket i UI 10.08.2026) — måler noe helt
+    annet enn geo_analysis.keywords_with_ai_overview() (som kun sjekker om et AI Overview
+    finnes i SERP for et SPORET søkeord, ikke om Krogsveen faktisk siteres der). Bruker
+    google_ai_overviews_keywords fremfor google_ai_overviews — sistnevnte ga et tall
+    (49 siteringer) som ikke stemte med Ahrefs' eget UI-tall, mens _keywords-varianten
+    stemte tett (217 mot UI sine 265, sannsynligvis kun et øyeblikksbilde-avvik).
+    Verifisert live mot Ahrefs API 10.08.2026: chatgpt/gemini/perplexity/copilot/grok
+    stemte eksakt med UI."""
+    data = _get(
+        settings,
+        "site-explorer/ai-responses-count",
+        {
+            "target": target,
+            "date": date,
+            "mode": "subdomains",
+            "select": "google_ai_overviews_keywords,google_ai_mode,chatgpt,gemini,perplexity,copilot,grok",
+            "output": "json",
+        },
+    )
+    return data["ai_responses_count"]
+
+
 def get_site_metrics_history(
     settings: Settings, date_from: str, target: str = "krogsveen.no", history_grouping: str = "weekly"
 ) -> list[dict]:

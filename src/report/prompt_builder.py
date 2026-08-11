@@ -27,7 +27,12 @@ REPORT_FORMAT = """
    b) Trekk fram tydelig uenighet mellom kildene der det finnes (f.eks. hvis Krogsveen
       nevnes hos Claude/Gemini men ikke ChatGPT/Perplexity) — det er ofte mer informativt
       enn gjennomsnittet.
-   c) Søkeord med ai_overview i SERP (fra Ahrefs rank tracker).
+   c) Søkeord med ai_overview i SERP (fra Ahrefs rank tracker) — dette er begrenset til de
+      338 sporede ordene. geo.ai_responses_count gir samme type tall (siteringer +
+      distinkte siterte sider), men domenevidt fra Ahrefs — IKKE begrenset til de sporede
+      ordene, og et helt annet tall enn (c) av den grunn (ofte betydelig høyere). Ikke
+      forveksle de to eller behandle det ene som en delmengde av det andre i teksten;
+      presiser at det domenevide tallet dekker hele domenet, ikke bare sporede ord.
    d) geo.ga4_ai_referral: faktisk trafikk fra AI-chatter (chatgpt.com, claude.ai,
       gemini.google.com, perplexity, copilot.com) som har klikket seg inn på krogsveen.no,
       med økter/engasjement/konverteringer per kilde. Dette er selvsjekkens motstykke —

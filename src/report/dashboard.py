@@ -298,6 +298,12 @@ _TEMPLATE = r"""<!doctype html>
     <div id="ai-overview-list"></div>
   </div>
 
+  <div class="card" id="ai-responses-card" style="display:none">
+    <h2>AI-siteringer (domenevidt)</h2>
+    <div class="card-sub">Antall siteringer av krogsveen.no i AI-plattformers svar, HELE domenet — ikke begrenset til de 338 sporede ordene over. Ahrefs' egen siterings-telling, separat fra selvsjekken under.</div>
+    <div class="table-scroll"><table id="ai-responses-table"><thead><tr><th>Platform</th><th>Siteringer</th><th>Sider</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
   <div class="card">
     <h2>GEO / AI-synlighet</h2>
     <div class="card-sub">Egen selvsjekk mot Claude, ChatGPT, Gemini og Perplexity — ekte data, 36 prompts hver</div>
@@ -383,7 +389,7 @@ _TEMPLATE = r"""<!doctype html>
   addStat("GSC-klikk (uke)", allDevice ? fmt.format(allDevice.clicks) : "–",
     allDevice ? fmt.format(allDevice.impressions) + " visninger" : "");
   var aiCount = (data.geo.ai_overview_sokeord || []).length;
-  addStat("AI Overview-eksponering", aiCount, "søkeord med AI Overview i SERP");
+  addStat("AI Overview-eksponering", aiCount, "av 338 sporede søkeord — se domenevid siteringstelling lenger ned for full bredde");
 
   function addSelfcheckStat(label, rows) {
     var mentions = (rows || []).filter(function (r) { return r.krogsveen_mentioned; }).length;
@@ -430,6 +436,32 @@ _TEMPLATE = r"""<!doctype html>
   });
   if (!aiRows.length) {
     aiList.innerHTML = '<div class="empty-note">Ingen søkeord med AI Overview denne uken</div>';
+  }
+
+  // ---- AI-siteringer (domenevidt) — Ahrefs' ai-responses-count, se ahrefs.py ----
+  var aiResponses = data.geo.ai_responses_count;
+  if (aiResponses) {
+    document.getElementById("ai-responses-card").style.display = "";
+    var AI_RESPONSES_LABELS = {
+      google_ai_overviews_keywords: "Google AI Overviews",
+      google_ai_mode: "Google AI Mode",
+      chatgpt: "ChatGPT",
+      gemini: "Gemini",
+      perplexity: "Perplexity",
+      copilot: "Copilot",
+      grok: "Grok",
+    };
+    var arBody = document.querySelector("#ai-responses-table tbody");
+    Object.keys(AI_RESPONSES_LABELS).forEach(function (key) {
+      var v = aiResponses[key];
+      if (!v) return;
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td>' + AI_RESPONSES_LABELS[key] + '</td>' +
+        '<td class="num">' + fmt.format(v.citations || 0) + '</td>' +
+        '<td class="num">' + fmt.format(v.pages || 0) + '</td>';
+      arBody.appendChild(tr);
+    });
   }
 
   // ---- Trend charts. Tar en liste av serier (points/color/label) i stedet for én, slik

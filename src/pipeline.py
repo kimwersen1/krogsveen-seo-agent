@@ -86,12 +86,17 @@ def run_pipeline(
         settings, windows["ahrefs_date"].isoformat(), windows["ahrefs_date_compared"].isoformat(), device="mobile"
     )
 
-    domain_rating, site_metrics = None, None
+    domain_rating, site_metrics, ai_responses_count = None, None, None
     competitor_benchmark: list[dict] = []
     footprint_rows: list[dict] = []
     if not over_budget:
         domain_rating = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat())
         site_metrics = ahrefs.get_site_metrics(settings, windows["ahrefs_date"].isoformat())
+        # Domenevidt antall AI-siteringer av Krogsveen (Ahrefs' nye ai-responses-count-
+        # endepunkt, 10.08.2026) — dekker HELE domenet, ikke bare de 338 sporede Rank
+        # Tracker-ordene som geo_analysis.keywords_with_ai_overview() under er begrenset
+        # til. Bruker etterspurte dette selv etter å ha sammenlignet mot Ahrefs' eget UI.
+        ai_responses_count = ahrefs.get_ai_responses_count(settings, windows["ahrefs_date"].isoformat())
 
         for competitor in (settings.competitors or DASHBOARD_COMPETITORS_FALLBACK):
             comp_dr = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat(), target=competitor)
@@ -337,6 +342,8 @@ def run_pipeline(
             "perplexity_selvsjekk": perplexity_selfcheck,
             "ga4_ai_referral": ga4_ai_referral_rows,
             "ga4_ai_referral_periode_dager": 28,
+            # Domenevidt (ikke bare de 338 sporede ordene) — se ahrefs.get_ai_responses_count.
+            "ai_responses_count": ai_responses_count,
         },
         "tiltak": tiltak_status,
         "konkurrenter": settings.competitors,
