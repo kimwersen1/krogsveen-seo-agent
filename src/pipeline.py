@@ -90,28 +90,48 @@ def run_pipeline(
     competitor_benchmark: list[dict] = []
     footprint_rows: list[dict] = []
     if not over_budget:
-        domain_rating = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat())
-        site_metrics = ahrefs.get_site_metrics(settings, windows["ahrefs_date"].isoformat())
-        # Domenevidt antall AI-siteringer av Krogsveen (Ahrefs' nye ai-responses-count-
-        # endepunkt, 10.08.2026) — dekker HELE domenet, ikke bare de 338 sporede Rank
-        # Tracker-ordene som geo_analysis.keywords_with_ai_overview() under er begrenset
-        # til. Bruker etterspurte dette selv etter å ha sammenlignet mot Ahrefs' eget UI.
-        ai_responses_count = ahrefs.get_ai_responses_count(settings, windows["ahrefs_date"].isoformat())
+        # 80%-sjekken over er et øyeblikksbilde FØR denne kjøringen starter — den fanger
+        # ikke opp at selve kjøringen (domain rating + metrics + 8 konkurrenter + bredde-
+        # kartlegging) kan bruke opp resten av kvoten underveis, eller at kvoten er brukt
+        # opp av annen aktivitet på samme Ahrefs-konto mellom sjekken og selve kallet.
+        # Skjedde reelt 17.08.2026: budsjettsjekken sa OK, men kvoten tok slutt midt i
+        # konkurrentløkka (403 "API units limit reached") — et ufanget AhrefsError her
+        # veltet HELE kjøringen (ingen rapport, ingen e-post) selv om rank tracker + GSC +
+        # GEO-selvsjekk allerede var hentet ferdig på det tidspunktet. Samme robusthets-
+        # prinsipp som Gemini/GA4/e-post under: en ekstern feil skal degradere til et
+        # notert datahull, aldri velte resten av ukesrapporten.
+        try:
+            domain_rating = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat())
+            site_metrics = ahrefs.get_site_metrics(settings, windows["ahrefs_date"].isoformat())
+            # Domenevidt antall AI-siteringer av Krogsveen (Ahrefs' nye ai-responses-count-
+            # endepunkt, 10.08.2026) — dekker HELE domenet, ikke bare de 338 sporede Rank
+            # Tracker-ordene som geo_analysis.keywords_with_ai_overview() under er begrenset
+            # til. Bruker etterspurte dette selv etter å ha sammenlignet mot Ahrefs' eget UI.
+            ai_responses_count = ahrefs.get_ai_responses_count(settings, windows["ahrefs_date"].isoformat())
 
-        for competitor in (settings.competitors or DASHBOARD_COMPETITORS_FALLBACK):
-            comp_dr = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat(), target=competitor)
-            comp_metrics = ahrefs.get_site_metrics(settings, windows["ahrefs_date"].isoformat(), target=competitor)
-            competitor_benchmark.append(
-                {
-                    "domain": competitor,
-                    "domain_rating": comp_dr.get("domain_rating"),
-                    "org_traffic": comp_metrics.get("org_traffic"),
-                }
+            for competitor in (settings.competitors or DASHBOARD_COMPETITORS_FALLBACK):
+                comp_dr = ahrefs.get_domain_rating(settings, windows["ahrefs_date"].isoformat(), target=competitor)
+                comp_metrics = ahrefs.get_site_metrics(settings, windows["ahrefs_date"].isoformat(), target=competitor)
+                competitor_benchmark.append(
+                    {
+                        "domain": competitor,
+                        "domain_rating": comp_dr.get("domain_rating"),
+                        "org_traffic": comp_metrics.get("org_traffic"),
+                    }
+                )
+
+            # Bredere søkeordsdekning enn de 338 manuelt sporede Rank Tracker-ordene — billig
+            # (with_metrics=False, ~2 enheter/rad) bredde-kartlegging, se ahrefs.py for detaljer.
+            footprint_rows = ahrefs.get_organic_keywords_paginated(
+                settings, "krogsveen.no", windows["ahrefs_date"].isoformat()
             )
-
-        # Bredere søkeordsdekning enn de 338 manuelt sporede Rank Tracker-ordene — billig
-        # (with_metrics=False, ~2 enheter/rad) bredde-kartlegging, se ahrefs.py for detaljer.
-        footprint_rows = ahrefs.get_organic_keywords_paginated(settings, "krogsveen.no", windows["ahrefs_date"].isoformat())
+        except ahrefs.AhrefsError as e:
+            logger.warning("Ahrefs-kvote tok slutt midt i kjøringen: %s", e)
+            data_gaps.append(
+                f"Ahrefs-kvoten tok slutt midt i kjøringen ({e}) — noe av domain rating/"
+                "metrics/konkurrentbenchmark/organisk fotavtrykk kan mangle denne uken, "
+                "men resten av rapporten er ikke påvirket."
+            )
 
     # GSC-data kan ha noen dagers etterslep fra Google — spør om et vindu som slutter
     # noen dager tilbake i tid i stedet for i går.
