@@ -162,7 +162,29 @@ def main() -> None:
     print(f"Enheter brukt før kjøring: {used_before}")
     print(f"Konkurrenter denne kjøringen: {', '.join(competitors)}")
 
-    result = run_discovery(settings, competitors, args.min_volume)
+    # Denne jobben er den dyreste enkeltkjøringen i hele pipelinen (12 000-16 000 enheter,
+    # se moduldocstring) og kjører rett i starten av budsjettsyklusen (1./15.) — akkurat
+    # den kombinasjonen som førte til det ukentlige krasjet 17.08.2026 i pipeline.py, se
+    # samme kommentar der. run_discovery() har ingen egen budsjettpause underveis (fem
+    # sekvensielle Ahrefs-kall uten try/except), så samme mønster gjentas her: sjekk før,
+    # og fang AhrefsError uansett i tilfelle kvoten tar slutt midt i selve kjøringen.
+    # Skriver hverken til Drive-dokumentet eller historikken i så fall — forrige kjente
+    # gode tilstand står urørt, og jobben avsluttes rent (exit 0) i stedet for å krasje
+    # rødt i GitHub Actions for noe som bare betyr "prøv igjen neste syklus".
+    if ahrefs.usage_over_budget(usage_before):
+        print(
+            f"Ahrefs-kvote >80% brukt ({used_before}/"
+            f"{usage_before.get('units_limit_api_key') or usage_before.get('units_limit_workspace')} enheter) "
+            "— hopper over denne kjøringen. Drive-dokument og historikk er ikke endret."
+        )
+        return
+
+    try:
+        result = run_discovery(settings, competitors, args.min_volume)
+    except ahrefs.AhrefsError as e:
+        print(f"Ahrefs-kvoten tok slutt midt i kjøringen ({e}) — hopper over denne kjøringen. "
+              "Drive-dokument og historikk er ikke endret.")
+        return
     format_console(result)
 
     usage_after = ahrefs.get_subscription_usage(settings)
