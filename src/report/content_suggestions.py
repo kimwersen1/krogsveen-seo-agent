@@ -151,14 +151,19 @@ def generate_content_briefs(
     return json.loads(raw)
 
 
-def format_content_briefs_markdown(briefs: list[dict], generated_label: str) -> str:
+def format_content_briefs_markdown(briefs: list[dict], generated_label: str, kilde_beskrivelse: str | None = None) -> str:
     """Formaterer strukturerte forslag (se generate_content_briefs()) som markdown, klar
     for src.report.drive_writer.replace_content_briefs_doc() (samme markdown->Docs-API-
-    konverter som den ukentlige rapporten allerede bruker)."""
+    konverter som den ukentlige rapporten allerede bruker).
+
+    kilde_beskrivelse: overstyrer standardsetningen om datagrunnlag — brukt 18.08.2026 for
+    en engangskjøring på ekte GSC-klikkdata i stedet for Ahrefs (kvoten var midlertidig
+    brukt opp), der «konkurrent-gap-analyse» ville vært misvisende siden GSC ikke har
+    konkurrentdata."""
+    kilde = kilde_beskrivelse or "søkeord Krogsveen allerede rangerer på uten å spore, og konkurrent-gap-analyse"
     lines = [
         "# Innholdsforslag – Krogsveen SEO/GEO",
-        f"Generert {generated_label} — basert på søkeord Krogsveen allerede rangerer på "
-        "uten å spore, og konkurrent-gap-analyse.",
+        f"Generert {generated_label} — basert på {kilde}.",
         "",
     ]
     for i, brief in enumerate(briefs, start=1):
