@@ -170,17 +170,21 @@ def main() -> None:
     print(f"\nEnheter brukt i denne kjøringen: ~{used_after - used_before}")
 
     if args.to_drive:
-        print("\nBer Claude om 2-3 grundige innholdsforslag (SEO + GEO) basert på gap-listen...")
-        briefs = generate_content_briefs(settings, result["untracked"], result["gaps"])
+        conn = storage.get_connection()
+        previously_suggested = storage.get_recent_content_brief_topics(conn, limit_runs=3)
+        if previously_suggested:
+            print(f"\nFant {len(previously_suggested)} tidligere foreslåtte artikler siste 3 kjøringer — sender med for å unngå gjentagelse.")
+        print("Ber Claude om 2-3 grundige innholdsforslag (SEO + GEO) basert på gap-listen...")
+        briefs = generate_content_briefs(settings, result["untracked"], result["gaps"], previously_suggested)
         briefs_doc_url = None
         if briefs:
             today_label = date.today().isoformat()
             briefs_markdown = format_content_briefs_markdown(briefs, today_label)
             briefs_doc_url = replace_content_briefs_doc(settings, briefs_markdown)
-            conn = storage.get_connection()
             storage.save_content_briefs_meta(conn, briefs_doc_url, today_label, len(briefs))
-            conn.close()
+            storage.save_content_brief_topics(conn, today_label, briefs)
             print(f"Innholdsforslag skrevet til: {briefs_doc_url}")
+        conn.close()
 
         title = f"Søkeordsoppdagelse – {date.today().strftime('%B %Y')}"
         url = prepend_report_section(settings, title, format_markdown(result, briefs_doc_url))

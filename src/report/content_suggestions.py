@@ -83,16 +83,32 @@ Foreslå NØYAKTIG 3 grundige artikkelforslag, hver med BÅDE en SEO-vinkel og e
 søkevolum og tydeligst cluster-tilhørighet — konsolidering av mange beslektede long-tail-
 søk til én sterk side er ofte bedre enn ett forslag per enkeltord.
 
+Hvis en liste med TIDLIGERE FORESLÅTTE ARTIKLER er inkludert i brukermeldingen: gap-dataen
+endrer seg sjelden mye på to uker, så de samme høyest-volum-søkeordene dukker ofte opp
+igjen — ikke foreslå samme tittel eller vinkel på nytt. Bruk i stedet en tydelig annen
+vinkel på samme behov (annen underkategori, spørsmålstype eller sidetype), eller gå videre
+til neste sterkeste gap i listen. Kun foreslå noe som ligner en tidligere artikkel hvis det
+reelt sett dekker et annet spørsmål/behov enn den gjorde.
+
 Returner KUN gyldig JSON, ingen annen tekst, i dette skjemaet:
 [{{"tittel": "...", "malgruppe_sokeord": ["...", "..."], "seo_fokus": "1-2 setninger",
 "geo_fokus": "1-2 setninger", "foreslatt_struktur": ["Spørsmål-overskrift 1", "..."],
 "begrunnelse": "hvorfor dette er et reelt hull, 1-2 setninger"}}]"""
 
 
-def generate_content_briefs(settings: Settings, untracked: list[dict], gaps: list[dict]) -> list[dict]:
+def generate_content_briefs(
+    settings: Settings,
+    untracked: list[dict],
+    gaps: list[dict],
+    previously_suggested: list[dict] | None = None,
+) -> list[dict]:
     """Returnerer 2-3 strukturerte innholdsforslag (title/keywords/seo/geo/struktur/
     begrunnelse) som Python-dicts, klare til å bygges om til et Word-dokument via
-    build_briefs_docx(). Tom liste hvis det ikke er noe gap-data å basere forslag på."""
+    build_briefs_docx(). Tom liste hvis det ikke er noe gap-data å basere forslag på.
+
+    previously_suggested: tittel + søkeord fra tidligere kjøringer (se
+    storage.get_recent_content_brief_topics()) — sendes med til Claude for å unngå at samme
+    tema foreslås på nytt hver kjøring, se SYSTEM_PROMPT."""
     if not untracked and not gaps:
         return []
 
@@ -110,6 +126,12 @@ def generate_content_briefs(settings: Settings, untracked: list[dict], gaps: lis
             f"- {row['keyword']} (vol {row.get('volume')}, {row.get('_competitor')} pos {row.get('best_position')}, "
             f"Krogsveen: {row.get('krogsveen_position') or 'ingen rangering'}, cluster: {clusters_label})"
         )
+
+    if previously_suggested:
+        lines.append("\nTIDLIGERE FORESLÅTTE ARTIKLER (ikke foreslå samme tittel/vinkel på nytt):")
+        for brief in previously_suggested:
+            keywords_label = ", ".join(brief.get("malgruppe_sokeord", []))
+            lines.append(f"- [{brief.get('generated_at')}] {brief.get('tittel')} (søkeord: {keywords_label})")
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key, max_retries=5)
     # max_tokens romslig satt — komplekse strukturerte forslag over mange søkeord trigger

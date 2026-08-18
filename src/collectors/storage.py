@@ -79,6 +79,13 @@ CREATE TABLE IF NOT EXISTS content_briefs_meta (
     updated_at TEXT NOT NULL,
     antall_forslag INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS content_briefs_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    generated_at TEXT NOT NULL,
+    tittel TEXT NOT NULL,
+    malgruppe_sokeord TEXT
+);
 """
 
 
@@ -316,6 +323,45 @@ def get_content_briefs_meta(conn: sqlite3.Connection) -> dict | None:
     if not row:
         return None
     return {"url": row[0], "updated_at": row[1], "antall_forslag": row[2]}
+
+
+def save_content_brief_topics(conn: sqlite3.Connection, generated_at: str, briefs: list[dict]) -> None:
+    """Lagrer tittel + målgruppe-søkeord for hvert forslag i denne kjøringen — grunnlaget
+    for get_recent_content_brief_topics() sin duplikat-sjekk. Egen tabell fra
+    content_briefs_meta (som kun holder siste lenke) fordi vi her trenger faktisk historikk
+    over flere kjøringer, ikke bare siste tilstand. Oppdaget 18.08.2026: uten dette hadde
+    Claude ingen måte å vite hva som allerede var foreslått forrige kjøring, og foreslo
+    stort sett de samme toppsøkeordene på nytt hver gang (gap-dataen endrer seg sjelden nok
+    på to uker til at det naturlig varierer av seg selv)."""
+    conn.executemany(
+        "INSERT INTO content_briefs_history (generated_at, tittel, malgruppe_sokeord) VALUES (?, ?, ?)",
+        [(generated_at, b.get("tittel", ""), json.dumps(b.get("malgruppe_sokeord", []), ensure_ascii=False)) for b in briefs],
+    )
+    conn.commit()
+
+
+def get_recent_content_brief_topics(conn: sqlite3.Connection, limit_runs: int = 3) -> list[dict]:
+    """Tittel + søkeord for de N siste kjøringene (distinkte generated_at-datoer), eldste
+    først — sendes til generate_content_briefs() slik at Claude kan unngå å foreslå samme
+    vinkel på nytt."""
+    dates = [
+        row[0]
+        for row in conn.execute(
+            "SELECT DISTINCT generated_at FROM content_briefs_history ORDER BY generated_at DESC LIMIT ?",
+            (limit_runs,),
+        ).fetchall()
+    ]
+    if not dates:
+        return []
+    placeholders = ",".join("?" for _ in dates)
+    rows = conn.execute(
+        f"SELECT generated_at, tittel, malgruppe_sokeord FROM content_briefs_history "
+        f"WHERE generated_at IN ({placeholders}) ORDER BY generated_at ASC",
+        dates,
+    ).fetchall()
+    return [
+        {"generated_at": r[0], "tittel": r[1], "malgruppe_sokeord": json.loads(r[2] or "[]")} for r in rows
+    ]
 
 
 def get_position_trend(conn: sqlite3.Connection, weeks: int = 12, device: str = "mobile") -> list[dict]:
