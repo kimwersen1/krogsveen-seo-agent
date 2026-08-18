@@ -42,7 +42,7 @@ jobs:
           ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
         run: python scripts/keyword_discovery.py --to-drive
 
-      - name: Commit oppdatert historikk
+      - name: Commit oppdatert historikk og dashboard
         # Uten dette skriver scripts/keyword_discovery.py sin
         # storage.save_content_briefs_meta() til den ephemeral runnerens lokale
         # data/history.db, som forsvinner når jobben avsluttes — dashboardets
@@ -50,10 +50,13 @@ jobs:
         # i ukesvis, uavhengig av at selve Drive-dokumentet faktisk ble oppdatert
         # riktig hver gang (bekreftet 18.08.2026: Doc-en var reelt oppdatert
         # 15.08, men historikken/dashboardet visste det aldri). Samme mønster
-        # som weekly-report.yml sin tilsvarende steg.
+        # som weekly-report.yml sin tilsvarende steg. docs/index.html er lagt til
+        # her fordi scripts/keyword_discovery.py nå også patcher innholdsforslag-
+        # kortet direkte (dashboard.update_content_briefs_section()) i stedet for
+        # å vente på neste mandags fulle pipeline-kjøring.
         run: |
           git config user.name "krogsveen-seo-agent"
           git config user.email "actions@github.com"
-          git add data/history.db
-          git diff --staged --quiet && echo "Ingen endringer å committe" || git commit -m "Oppdater innholdsforslag-historikk"
+          git add data/history.db docs/index.html
+          git diff --staged --quiet && echo "Ingen endringer å committe" || git commit -m "Oppdater innholdsforslag-historikk og dashboard"
           git push

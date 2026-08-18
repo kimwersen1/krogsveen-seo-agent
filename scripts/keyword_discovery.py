@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.analysis.keyword_gap import find_competitor_gap_keywords, find_untracked_ranking_keywords  # noqa: E402
 from src.collectors import ahrefs, storage  # noqa: E402
+from src.report import dashboard  # noqa: E402
 from src.report.content_suggestions import format_content_briefs_markdown, generate_content_briefs  # noqa: E402
 from src.report.drive_writer import prepend_report_section, replace_content_briefs_doc  # noqa: E402
 from src.settings import load_settings  # noqa: E402
@@ -206,6 +207,15 @@ def main() -> None:
             storage.save_content_briefs_meta(conn, briefs_doc_url, today_label, len(briefs))
             storage.save_content_brief_topics(conn, today_label, briefs)
             print(f"Innholdsforslag skrevet til: {briefs_doc_url}")
+
+            # Patcher kun innholdsforslag-kortet i det allerede publiserte dashboardet, uten
+            # å vente på neste mandags fulle pipeline-kjøring — se
+            # dashboard.update_content_briefs_section() for hvorfor (18.08.2026-funn: dette
+            # manglet, så "sist oppdatert" lå fast i opptil seks dager selv om Doc-en og
+            # historikken var korrekte med det samme).
+            updated = dashboard.update_content_briefs_section(storage.get_content_briefs_meta(conn))
+            if updated:
+                print(f"Dashboard oppdatert: {updated}")
         conn.close()
 
         title = f"Søkeordsoppdagelse – {date.today().strftime('%B %Y')}"

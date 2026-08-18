@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date
 from pathlib import Path
 
@@ -106,6 +107,31 @@ def render_dashboard(payload: dict, output_path: Path = OUTPUT_PATH) -> Path:
     output_path.write_text(html, encoding="utf-8")
     logger.info("Dashboard skrevet til %s", output_path)
     return output_path
+
+
+def update_content_briefs_section(meta: dict | None, output_path: Path = OUTPUT_PATH) -> Path | None:
+    """Patcher KUN innholdsforslag-kortet i den allerede publiserte dashboard-HTML-en, uten
+    å røre resten av siden (payload['generated'] og alt annet er fra forrige ukentlige
+    kjøring, ikke denne). Brukt av scripts/keyword_discovery.py --to-drive, som ikke har
+    (og ikke bør hente på nytt for) resten av ukesrapportens analysedata — kun den
+    bi-ukentlige jobbens egen del av siden.
+
+    Oppdaget 18.08.2026: uten dette lå dashboardets 'sist oppdatert'-dato på innholdsforslag
+    fast til neste mandags fulle pipeline-kjøring, selv om selve Drive-dokumentet og
+    historikken i data/history.db var korrekt oppdatert med det samme av
+    scripts/keyword_discovery.py. Samme mønster som d8565d8/011fddb-fiksene, men for det
+    normale, løpende tilfellet fremover i stedet for en engangsretting."""
+    if not output_path.exists():
+        logger.warning("Fant ikke %s — kan ikke oppdatere innholdsforslag-kortet uten en eksisterende dashboard.", output_path)
+        return None
+    html = output_path.read_text(encoding="utf-8")
+    match = re.search(r'<script id="dashboard-data" type="application/json">(.*?)</script>', html, re.DOTALL)
+    if not match:
+        logger.warning("Fant ikke dashboard-data-payloaden i %s — hopper over oppdatering.", output_path)
+        return None
+    payload = json.loads(match.group(1))
+    payload["innholdsforslag_dokument"] = meta
+    return render_dashboard(payload, output_path)
 
 
 _TEMPLATE = r"""<!doctype html>
