@@ -7,16 +7,16 @@
       "reason": "Kjøper-side søk (til salgs, kjøpe bolig, gi bud, budrunde) — ingen av Krogsveens tre reelle konverteringshandlinger (se conversion_actions.json) kan trigges av en kjøper, kun av en selger/utleier som booker møte med megler. Bekreftet mot ekte 90-dagers Ads-data (SEO×Ads Synergy-kjøring 12.08.2026, Notion §9): hele kjop-clusteret ga 91 impresjoner / 0 konverteringer. Verdifullt for SEO (bygger fremtidig selger-pipeline når dagens kjøpere selger om noen år), men skal ALDRI presenteres som et betalt-budsjett-case."
     },
     "finansiering": {
-      "paid_relevant": null,
-      "label": "usikker — trenger samme revisjon som kjop",
-      "confidence": "flagged_for_review",
-      "reason": "finansieringsbevis/boliglån/egenkapital er også primært kjøper-side søk (skaffe finansieringsbevis for å kunne by) — samme strukturelle mismatch som kjop kan gjelde her, men vi har ikke tilsvarende harde 90-dagers konverteringstall for akkurat dette clusteret ennå. Ikke reklassifisert uten bekreftelse — spurt Kim/Ole eksplisitt om dette."
+      "paid_relevant": false,
+      "label": "SEO-only (lav prioritet)",
+      "confidence": "confirmed",
+      "reason": "Samme kjøper-side-mismatch som kjop (finansieringsbevis/boliglån/egenkapital skaffes for å by, ikke for å selge) — bekreftet av Kim (chat 20.08.2026: 'nokså liten verdi'). Ikke evidensbekreftet med et eget 90-dagers impresjon/konvertering-tall slik kjop er (91/0), men behandles likt: aldri presenter som betalt-budsjett-case."
     },
     "forsikring": {
-      "paid_relevant": null,
-      "label": "usikker — blandet kjøper/selger-intensjon",
-      "confidence": "flagged_for_review",
-      "reason": "Regexen (forsikring|eierskifte) fanger både boligselgerforsikring (selger-side, reell konverteringshandling: /selge/boligselgerforsikring i tiltak.json) og boligkjøperforsikring (kjøper-side, /kjope/boligkjoperforsikring i tiltak.json) i samme klynge — sannsynligvis to ulike sider av samme mynt som kjop/finansiering-funnet. Bør splittes i to klynger (selger- vs. kjøper-forsikring) før paid-relevans kan vurderes presist. Ikke gjort uten bekreftelse."
+      "paid_relevant": false,
+      "label": "SEO-only (lav prioritet)",
+      "confidence": "confirmed",
+      "reason": "Blandet kjøper-/selgerforsikring i samme regex (boligselgerforsikring vs. boligkjøperforsikring) — bekreftet lav verdi av Kim (chat 20.08.2026: 'nokså liten verdi'). Vurder likevel å splitte i to klynger (selger- vs. kjøper-forsikring) hvis clusteret senere skal brukes til noe mer presist enn 'lav prioritet' — selgersiden (boligselgerforsikring) kan i teorien fortsatt trigge 'Booket Møte' og er ikke nødvendigvis like verdiløs som kjøpersiden."
     },
     "boligverdi": {
       "paid_relevant": true,
