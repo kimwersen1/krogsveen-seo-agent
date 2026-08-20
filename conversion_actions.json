@@ -1,0 +1,11 @@
+{
+  "krogsveen": {
+    "actions": [
+      {"name": "Booket Møte", "value_nok": 25000, "priority": "primary", "side": "seller_landlord"},
+      {"name": "sql__avtal_møte_med_megler__sendt_inn_sk", "value_nok": null, "priority": "secondary", "side": "seller_landlord"},
+      {"name": "Leievurdering Innsendt skjema", "value_nok": 2500, "priority": "secondary", "side": "landlord"}
+    ],
+    "source": "Notion Customer Context §6 Google Ads Account (confirmed via conversion_action.value_settings, 2026-07-08)",
+    "note": "Ingen kjøper-side konverteringshandling finnes i Krogsveens Ads-konto — en klynge kan derfor kun regnes som 'betalt-kommersiell' hvis en søker i den plausibelt kan trigge en av disse tre handlingene (booke møte med megler for å selge, eller sende inn leievurdering). Se cluster_paid_relevance.json for vurdering per klynge."
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "krogsveen": {
+    "kjop": {
+      "paid_relevant": false,
+      "label": "SEO-only",
+      "confidence": "confirmed",
+      "reason": "Kjøper-side søk (til salgs, kjøpe bolig, gi bud, budrunde) — ingen av Krogsveens tre reelle konverteringshandlinger (se conversion_actions.json) kan trigges av en kjøper, kun av en selger/utleier som booker møte med megler. Bekreftet mot ekte 90-dagers Ads-data (SEO×Ads Synergy-kjøring 12.08.2026, Notion §9): hele kjop-clusteret ga 91 impresjoner / 0 konverteringer. Verdifullt for SEO (bygger fremtidig selger-pipeline når dagens kjøpere selger om noen år), men skal ALDRI presenteres som et betalt-budsjett-case."
+    },
+    "finansiering": {
+      "paid_relevant": null,
+      "label": "usikker — trenger samme revisjon som kjop",
+      "confidence": "flagged_for_review",
+      "reason": "finansieringsbevis/boliglån/egenkapital er også primært kjøper-side søk (skaffe finansieringsbevis for å kunne by) — samme strukturelle mismatch som kjop kan gjelde her, men vi har ikke tilsvarende harde 90-dagers konverteringstall for akkurat dette clusteret ennå. Ikke reklassifisert uten bekreftelse — spurt Kim/Ole eksplisitt om dette."
+    },
+    "forsikring": {
+      "paid_relevant": null,
+      "label": "usikker — blandet kjøper/selger-intensjon",
+      "confidence": "flagged_for_review",
+      "reason": "Regexen (forsikring|eierskifte) fanger både boligselgerforsikring (selger-side, reell konverteringshandling: /selge/boligselgerforsikring i tiltak.json) og boligkjøperforsikring (kjøper-side, /kjope/boligkjoperforsikring i tiltak.json) i samme klynge — sannsynligvis to ulike sider av samme mynt som kjop/finansiering-funnet. Bør splittes i to klynger (selger- vs. kjøper-forsikring) før paid-relevans kan vurderes presist. Ikke gjort uten bekreftelse."
+    },
+    "boligverdi": {
+      "paid_relevant": true,
+      "label": "betalt-relevant (provisorisk)",
+      "confidence": "provisional",
+      "reason": "Selger som sjekker boligverdi er et klassisk selger-signal mot 'Booket Møte'. MERK et eget funn fra 12.08-kjøringen (Notion §9): innad i dette ene clusteret er 'boligverdi/hva er boligen verdt'-fraseringen lavkonverterende (677 klikk / 1 konv / CPA 3906 NOK) mens 'verdivurdering'-fraseringen er svært høykonverterende (63,5 konv / 780 737 NOK) — samme regex/cluster skjuler altså to atferdsmessig svært ulike fraseringer. Vurder å splitte boligverdi i to underklynger (boligverdi-sjekk vs. verdivurdering-bestilling) — flagget som eget spørsmål til Kim, ikke gjort her."
+    },
+    "boligpriser": {"paid_relevant": true, "label": "betalt-relevant (provisorisk)", "confidence": "provisional", "reason": "Markedsundersøkelse kan lede til møte-booking, men svakere/mer indirekte signal enn boligverdi — ikke separat evidensbekreftet ennå."},
+    "solgte_boliger": {"paid_relevant": true, "label": "betalt-relevant (provisorisk)", "confidence": "provisional", "reason": "Solgt-pris-research er ofte et tidlig selger-signal (vurderer om det er verdt å selge nå) — ikke separat evidensbekreftet ennå."},
+    "lokal_megler": {"paid_relevant": true, "label": "betalt-relevant (provisorisk)", "confidence": "provisional", "reason": "'[Type] megler i [by]' er i norsk kontekst normalt et selger-søk (kjøpere leier sjelden inn egen megler) — direkte mot 'avtal møte med megler'. Ikke separat evidensbekreftet ennå."},
+    "merkevare": {"paid_relevant": true, "label": "betalt-relevant", "confidence": "confirmed", "reason": "Merkevaresøk er relevant uavhengig av kjøper/selger-side — brand-forsvar er en egen, veletablert paid-logikk (~90% brand impression share, se Notion §5)."}
+  }
+}

@@ -122,6 +122,62 @@ def get_page_performance(settings: Settings, date_from: str, date_to: str, row_l
     return _query(settings, date_from, date_to, "page", row_limit)
 
 
+def get_query_page_performance_paginated(
+    settings: Settings, date_from: str, date_to: str, max_rows: int = 25000, page_size: int = 5000
+) -> list[dict]:
+    """Søkeord + landingsside i SAMME rad (searchanalytics.query støtter flere dimensjoner
+    samtidig — bekreftet 18.08.2026 live mot krogsveen.no). Dette er join-nøkkel #2 for
+    Ads-siden (query + landing-page URL, se SEO×Ads Synergy-datakontrakten) — uten denne
+    kan kun søkeord-siden av joinen gjøres, ikke landingsside-siden. Samme paginerings-
+    mønster som get_query_performance_paginated()."""
+    creds = _credentials(settings)
+    service = build("webmasters", "v3", credentials=creds, cache_discovery=False)
+    rows: list[dict] = []
+    start_row = 0
+    while len(rows) < max_rows:
+        body = {
+            "startDate": date_from,
+            "endDate": date_to,
+            "dimensions": ["query", "page"],
+            "rowLimit": page_size,
+            "startRow": start_row,
+        }
+        response = (
+            service.searchanalytics().query(siteUrl=settings.google_search_console_property, body=body).execute()
+        )
+        page = response.get("rows", [])
+        if not page:
+            break
+        for row in page:
+            rows.append(
+                {
+                    "query": row["keys"][0],
+                    "page": row["keys"][1],
+                    "clicks": int(row.get("clicks", 0)),
+                    "impressions": int(row.get("impressions", 0)),
+                    "ctr": round(row.get("ctr", 0.0) * 100, 4),
+                    "position": round(row.get("position", 0.0), 4),
+                }
+            )
+        if len(page) < page_size:
+            break
+        start_row += page_size
+    logger.info("GSC OAuth: %d query+page-rader paginert (%s -> %s)", len(rows), date_from, date_to)
+    return rows
+
+
+def top_landing_page_by_query(rows: list[dict]) -> dict[str, str]:
+    """Reduserer get_query_page_performance_paginated() sitt output til én landingsside per
+    søkeord — den siden med flest klikk for det søkeordet (mest sannsynlige reelle
+    destinasjon, siden ett søkeord kan ha flere sider med impresjoner over en periode)."""
+    best: dict[str, tuple[int, str]] = {}
+    for row in rows:
+        query, page, clicks = row["query"], row["page"], row["clicks"]
+        if query not in best or clicks > best[query][0]:
+            best[query] = (clicks, page)
+    return {query: page for query, (_, page) in best.items()}
+
+
 def get_site_performance(settings: Settings, date_from: str, date_to: str) -> list[dict]:
     """Site-wide klikk/visninger/CTR/posisjon per enhetstype PLUSS en samlet "all"-rad —
     direkte via brukerens egen GSC-tilgang, samme datakilde som get_query_performance/
