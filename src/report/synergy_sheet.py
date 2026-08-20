@@ -14,8 +14,10 @@ VIKTIG: Denne modulen bygger fanene fra det som faktisk er tilgjengelig i dag.
   (Ahrefs serp_features) — ukjent (None) for resten av GSC-universet med mindre man
   kjører Ahrefs serp-overview per søkeord (koster ~4 enheter/rad, upraktisk i skala for
   tusenvis av rader).
-- pages: klikk/posisjon fra GSC. lcp/inp/cls/mobile_friendly er ALLTID None her — ingen
-  PSI/CrUX-kilde er koblet til denne kodebasen ennå. Se cwv_source-parameteren.
+- pages: klikk/posisjon fra GSC. lcp/inp/cls fra src.collectors.psi.get_core_web_vitals_for_urls()
+  (testet og bekreftet fungerende 20.08.2026, Kims egen PSI-nøkkel). mobile_friendly er
+  ALLTID None — se psi.py sin docstring for hvorfor (Google la ned den dedikerte APIen
+  for dette i 2023, ingen god erstatning finnes).
 - keyword_gap: reshapet fra src.analysis.keyword_gap (Ahrefs), men i "vår posisjon 11-20"-
   formen spesifisert i kontrakten, ikke dagens "vi mangler helt/rangerer svakt (>50)"-form.
 - ai_visibility: fra GEO-selvsjekkene (Claude/ChatGPT/Gemini/Perplexity), aggregert per
@@ -127,8 +129,9 @@ def build_queries_rows(
 
 def build_pages_rows(page_rows: list[dict], cwv_lookup: dict[str, dict] | None = None) -> list[dict]:
     """page_rows: fra gsc_oauth.get_page_performance(). cwv_lookup: {url: {lcp, inp, cls,
-    mobile_friendly}} — None (ikke 0) for alle felt hvis cwv_lookup ikke er gitt, se
-    modul-docstring om at ingen PSI/CrUX-kilde er koblet inn ennå."""
+    mobile_friendly}} — typisk output fra src.collectors.psi.get_core_web_vitals_for_urls().
+    None for alle felt hvis cwv_lookup ikke er gitt (bakoverkompatibelt) eller for en URL
+    uten nok CrUX-trafikk til en offisiell poengsum."""
     cwv_lookup = cwv_lookup or {}
     result = []
     for row in page_rows:

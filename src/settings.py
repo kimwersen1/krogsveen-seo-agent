@@ -62,6 +62,7 @@ class Settings:
     gemini_model: str
     perplexity_api_key: str
     perplexity_model: str
+    google_psi_api_key: str
     clusters: dict = field(default_factory=dict)
     config: dict = field(default_factory=dict)
     tiltak: list = field(default_factory=list)
@@ -163,6 +164,10 @@ def load_settings() -> Settings:
         gemini_model=_optional("GEMINI_MODEL", "gemini-flash-lite-latest"),
         perplexity_api_key=_optional("PERPLEXITY_API_KEY"),
         perplexity_model=_optional("PERPLEXITY_MODEL", "sonar"),
+        # Valgfritt — PageSpeed Insights API for Core Web Vitals (LCP/INP/CLS/mobile-
+        # friendly) per URL, se src/collectors/psi.py. Nøkkel opprettet 20.08.2026,
+        # begrenset til kun PageSpeed Insights API i Google Cloud Console.
+        google_psi_api_key=_optional("GOOGLE_PSI_API_KEY"),
         clusters=_load_json("clusters.json"),
         config=_load_json("config.json"),
         tiltak=_load_json("tiltak.json"),
