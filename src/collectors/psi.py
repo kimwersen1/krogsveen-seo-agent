@@ -57,7 +57,7 @@ def get_core_web_vitals(settings: Settings, url: str, strategy: str = "mobile") 
     resp = requests.get(
         PSI_URL,
         params={"url": url, "strategy": strategy, "category": "performance", "key": settings.google_psi_api_key},
-        timeout=30,
+        timeout=60,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -89,7 +89,11 @@ def get_core_web_vitals_for_urls(settings: Settings, urls: list[str], strategy: 
     for url in urls:
         try:
             result[url] = get_core_web_vitals(settings, url, strategy=strategy)
-        except requests.HTTPError as e:
+        except requests.exceptions.RequestException as e:
+            # RequestException dekker HTTPError OG ReadTimeout/ConnectionError — bekreftet
+            # nødvendig 20.08.2026: enkelte URL-er trigger en full Lighthouse-kjøring på
+            # PSI-siden som kan ta over 30s, og et rent HTTPError-filter lot det krasje
+            # hele batchen i stedet for å hoppe over den ene trege URL-en.
             logger.warning("PSI-kall feilet for %s: %s", url, e)
             result[url] = {"url": url, "lcp": None, "inp": None, "cls": None, "mobile_friendly": None, "error": str(e)}
     return result
