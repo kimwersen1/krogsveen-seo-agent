@@ -20,9 +20,10 @@ VIKTIG: Denne modulen bygger fanene fra det som faktisk er tilgjengelig i dag.
   formen spesifisert i kontrakten, ikke dagens "vi mangler helt/rangerer svakt (>50)"-form.
 - ai_visibility: fra GEO-selvsjekkene (Claude/ChatGPT/Gemini/Perplexity), aggregert per
   prompt. aio_fires er None (ukjent) med mindre prompten også er et Ahrefs-sporet søkeord.
-- organic_conversions: INGEN kilde koblet ennå (krever GA4 conversions-metric per
-  landingPage/query, ikke bygget — se conversions_source-parameteren). Tabellen skrives
-  tom med en eksplisitt "ikke tilgjengelig"-note, ALDRI stille utelatt.
+- organic_conversions: fra ga4_oauth.get_organic_conversions_by_landing_page() (testet og
+  bekreftet fungerende 18.08.2026, samme OAuth-tilgang som allerede finnes — ingen ny
+  tilgang trengt). GA4 har kun landingsside, ikke søkeord, som dimensjon — se den
+  funksjonens docstring for hvordan søkeord-nivå kobles via GSC sin query->page-relasjon.
 """
 from __future__ import annotations
 

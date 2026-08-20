@@ -105,3 +105,57 @@ def get_ai_referral_sessions(settings: Settings, date_from: str, date_to: str) -
         "GA4 OAuth: %d AI-referral-kilder med trafikk (%s -> %s)", len(rows), date_from, date_to
     )
     return rows
+
+
+def get_organic_conversions_by_landing_page(
+    settings: Settings, date_from: str, date_to: str, row_limit: int = 5000
+) -> list[dict]:
+    """Konverteringer per landingsside, filtrert til sessionDefaultChannelGroup='Organic
+    Search' — testet og bekreftet fungerende 18.08.2026 mot samme OAuth-tilgang som
+    get_ai_referral_sessions() (ingen ny tilgang trengs). GA4 har IKKE noe 'per søkeord'-
+    konsept — kun per landingsside. For søkeord-nivå konverteringer må denne joines mot
+    gsc_oauth.get_query_page_performance_paginated() sitt query->page-forhold (join-nøkkel
+    #2), se src.report.synergy_sheet.
+
+    MERK: totalRevenue kommer ofte tilbake som 0 selv der conversions > 0 (bekreftet:
+    /verdivurdering ga 12 konverteringer / 0 kr i samme test) — kronebeløpet per
+    konverteringshandling (f.eks. 25 000 kr for "Booket Møte") er satt i Google Ads sine
+    conversion_action.value_settings, ikke nødvendigvis speilet inn i GA4 som revenue.
+    Bruk conversions-antallet herfra sammen med kjente verdier fra
+    conversion_actions.json for en reell kronesum, ikke totalRevenue alene."""
+    creds = _credentials(settings)
+    service = build("analyticsdata", "v1beta", credentials=creds, cache_discovery=False)
+
+    body = {
+        "dateRanges": [{"startDate": date_from, "endDate": date_to}],
+        "dimensions": [{"name": "landingPagePlusQueryString"}],
+        "metrics": [{"name": "conversions"}, {"name": "totalRevenue"}],
+        "dimensionFilter": {
+            "filter": {"fieldName": "sessionDefaultChannelGroup", "stringFilter": {"value": "Organic Search"}}
+        },
+        "orderBys": [{"metric": {"metricName": "conversions"}, "desc": True}],
+        "limit": row_limit,
+    }
+    response = (
+        service.properties()
+        .runReport(property=f"properties/{settings.google_ga4_property_id}", body=body)
+        .execute()
+    )
+
+    rows = []
+    for row in response.get("rows", []):
+        conversions = float(_metric_value(row, 0))
+        if conversions <= 0:
+            continue
+        rows.append(
+            {
+                "landing_page_or_query": row["dimensionValues"][0]["value"],
+                "conversions": conversions,
+                "conversion_value": float(_metric_value(row, 1)),
+                "source": "GA4",
+            }
+        )
+    logger.info(
+        "GA4 OAuth: %d landingssider med organiske konverteringer (%s -> %s)", len(rows), date_from, date_to
+    )
+    return rows
