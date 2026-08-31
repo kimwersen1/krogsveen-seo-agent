@@ -122,6 +122,40 @@ def get_page_performance(settings: Settings, date_from: str, date_to: str, row_l
     return _query(settings, date_from, date_to, "page", row_limit)
 
 
+def get_page_performance_for_urls(settings: Settings, date_from: str, date_to: str, urls: list[str]) -> list[dict]:
+    """Klikk/impresjoner/posisjon for en SPESIFIKK liste URL-er, via dimensionFilterGroups
+    (page equals) — garanterer at akkurat disse sidene fanges opp uansett hvor de havner i
+    en generell get_page_performance()-sortering. Bygget 24.08.2026 for lavtrafikk-sider
+    (som tiltak.json sitt 'sider'-felt) der en vanlig row_limit=1000-pull risikerer å
+    utelate dem enkelte uker hvis de faller utenfor topp-1000 av alle sider på domenet."""
+    creds = _credentials(settings)
+    service = build("webmasters", "v3", credentials=creds, cache_discovery=False)
+    results = []
+    for url in urls:
+        body = {
+            "startDate": date_from,
+            "endDate": date_to,
+            "dimensions": ["page"],
+            "dimensionFilterGroups": [{"filters": [{"dimension": "page", "operator": "equals", "expression": url}]}],
+            "rowLimit": 1,
+        }
+        response = (
+            service.searchanalytics().query(siteUrl=settings.google_search_console_property, body=body).execute()
+        )
+        rows = response.get("rows", [])
+        results.append(
+            {
+                "page": url,
+                "clicks": int(rows[0].get("clicks", 0)) if rows else 0,
+                "impressions": int(rows[0].get("impressions", 0)) if rows else 0,
+                "ctr": round(rows[0].get("ctr", 0.0) * 100, 4) if rows else 0.0,
+                "position": round(rows[0].get("position", 0.0), 4) if rows else None,
+            }
+        )
+    logger.info("GSC OAuth: %d spesifikke URL-er slått opp direkte (%s -> %s)", len(results), date_from, date_to)
+    return results
+
+
 def get_query_page_performance_paginated(
     settings: Settings, date_from: str, date_to: str, max_rows: int = 25000, page_size: int = 5000
 ) -> list[dict]:

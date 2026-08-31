@@ -159,6 +159,21 @@ def run_pipeline(
                 settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
             )
             gsc_source = "oauth"
+
+            # Tiltak med et 'sider'-felt (f.eks. de 12 eiendomsmegler-fylkessidene,
+            # 24.08.2026) er ofte lavtrafikk-sider som risikerer å falle utenfor
+            # get_page_performance() sin row_limit=1000 enkelte uker — da ville
+            # tiltaks-effekt-sporingen mangle datapunkter akkurat de ukene det er mest
+            # interessant å se om trafikken beveger seg. Slår derfor opp disse EKSPLISITT
+            # og garantert (dimensionFilterGroups, ikke row_limit-avhengig), og fyller inn
+            # kun der den generelle pullen ikke allerede dekket dem.
+            tiltak_sider = {url for t in settings.tiltak for url in t.get("sider", [])}
+            already_covered = {row["page"] for row in gsc_page_rows}
+            missing_sider = sorted(tiltak_sider - already_covered)
+            if missing_sider:
+                gsc_page_rows += gsc_oauth.get_page_performance_for_urls(
+                    settings, windows["week_start"].isoformat(), gsc_available_end.isoformat(), missing_sider
+                )
         except HttpError as e:
             logger.warning("GSC OAuth-henting feilet denne uken: %s", e)
             data_gaps.append(f"GSC OAuth-henting feilet denne uken ({e}) — klikk/CTR per søkeord og site-wide-tall mangler.")
@@ -318,7 +333,14 @@ def run_pipeline(
     history_rows_all = storage.get_history(conn, "rank_tracker_weekly", weeks=8)
     history_rows_mobil = [r for r in history_rows_all if r.get("device") == "mobile"]
     history_rows_desktop = [r for r in history_rows_all if r.get("device") == "desktop"]
-    tiltak_status = tiltak_analysis.classify_all(settings.tiltak, history_rows_mobil, history_rows_desktop, today)
+    page_traffic_trends = {
+        t["side"]: storage.get_page_group_traffic_trend(conn, t["sider"], weeks=8)
+        for t in settings.tiltak
+        if t.get("sider")
+    }
+    tiltak_status = tiltak_analysis.classify_all(
+        settings.tiltak, history_rows_mobil, history_rows_desktop, today, page_traffic_trends
+    )
 
     position_trend = storage.get_position_trend(conn, weeks=12, device="mobile")
     position_trend_desktop = storage.get_position_trend(conn, weeks=12, device="desktop")

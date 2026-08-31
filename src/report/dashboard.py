@@ -668,6 +668,12 @@ _TEMPLATE = r"""<!doctype html>
     var posisjonHtml = (t.malord_posisjoner || []).map(function (mp) {
       return mp.malord + ": mobil " + fmtDevicePos(mp) + " · desktop " + fmtDevicePos(desktopByMalord[mp.malord]);
     }).join("<br>") || "–";
+    if (t.sidetrafikk) {
+      var st = t.sidetrafikk;
+      posisjonHtml += (posisjonHtml === "–" ? "" : "<br>") +
+        "<em>Sidetrafikk (sum): klikk " + st.klikk_forst + " → " + st.klikk_sist +
+        " · impr " + st.impresjoner_forst + " → " + st.impresjoner_sist + "</em>";
+    }
     tr.innerHTML =
       '<td class="mono">' + (t.side || "") + '</td>' +
       '<td>' + (t.malord || []).join(", ") + '</td>' +

@@ -397,6 +397,29 @@ def get_clicks_trend(conn: sqlite3.Connection, weeks: int = 12) -> list[dict]:
     return list(reversed(rows))
 
 
+def get_page_group_traffic_trend(conn: sqlite3.Connection, urls: list[str], weeks: int = 12) -> list[dict]:
+    """Summerte klikk/impresjoner PER UKE på tvers av en gruppe URL-er (f.eks. tiltak.json
+    sitt 'sider'-felt for de 12 eiendomsmegler-fylkessidene, 24.08.2026) — for å se om et
+    tiltak som endrer mange sider samtidig faktisk øker samlet trafikk til gruppen, ikke
+    bare om ett enkeltord flytter seg i Rank Tracker (se src/analysis/tiltak.py). Leser
+    fra gsc_weekly(dimension='page'), som src.collectors.gsc_oauth.get_page_performance_for_urls()
+    sørger for alltid dekker disse URL-ene (se src/pipeline.py)."""
+    if not urls:
+        return []
+    placeholders = ",".join("?" for _ in urls)
+    cur = conn.execute(
+        f"""SELECT week_start, SUM(clicks) as clicks, SUM(impressions) as impressions
+           FROM gsc_weekly
+           WHERE dimension = 'page' AND key IN ({placeholders})
+           GROUP BY week_start
+           ORDER BY week_start DESC
+           LIMIT ?""",
+        (*urls, weeks),
+    )
+    rows = [{"week_start": w, "clicks": c or 0, "impressions": i or 0} for w, c, i in cur.fetchall()]
+    return list(reversed(rows))
+
+
 def get_history(conn: sqlite3.Connection, table: str, weeks: int = 12) -> list[dict]:
     """Siste N uker fra en av tabellene, for trendgrafer (roadmap-punkt 2)."""
     if table not in {

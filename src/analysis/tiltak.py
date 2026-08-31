@@ -33,24 +33,50 @@ def _malord_posisjoner(history_rows: list[dict], malord: set[str]) -> list[dict]
     return result
 
 
+def _sidetrafikk_sammendrag(trend: list[dict]) -> dict | None:
+    """Første og siste kjente ukes klikk/impresjoner for en sidegruppe (tiltak.json sitt
+    'sider'-felt) — samme første/siste-mønster som _malord_posisjoner, men for samlet
+    sidetrafikk i stedet for enkeltord-posisjon. Bygget 24.08.2026 fordi et tiltak som
+    endrer HELE sider (ikke bare targeter ett søkeord) kan øke trafikk fra et bredt sett
+    long-tail-søk som malord-listen aldri fanger — se tiltak.json-notatet for de 12
+    eiendomsmegler-fylkessidene."""
+    if not trend:
+        return None
+    return {
+        "uker_med_data": len(trend),
+        "klikk_forst": trend[0]["clicks"],
+        "klikk_sist": trend[-1]["clicks"],
+        "impresjoner_forst": trend[0]["impressions"],
+        "impresjoner_sist": trend[-1]["impressions"],
+    }
+
+
 def classify_tiltak(
-    tiltak: dict, history_rows_mobil: list[dict], history_rows_desktop: list[dict], today: date
+    tiltak: dict,
+    history_rows_mobil: list[dict],
+    history_rows_desktop: list[dict],
+    today: date,
+    page_traffic_trend: list[dict] | None = None,
 ) -> dict:
     """history_rows_mobil/history_rows_desktop: rank_tracker_weekly-rader, hver forhånds-
     filtrert til én enhet, slik at posisjonstallene er sammenlignbare uke mot uke. Status-
     vurderingen (bekreftet effekt / avventer / osv.) beregnes fra mobil alene — samme
     primærkilde som resten av analysen — men begge enheters posisjoner vises, siden mobil
-    og desktop kan bevege seg i hver sin retning for samme søkeord (se CLAUDE.md/diffs.py)."""
+    og desktop kan bevege seg i hver sin retning for samme søkeord (se CLAUDE.md/diffs.py).
+
+    page_traffic_trend: fra storage.get_page_group_traffic_trend() for tiltak.get('sider'),
+    KUN gitt for tiltak som faktisk har et 'sider'-felt — se _sidetrafikk_sammendrag()."""
+    sidetrafikk = _sidetrafikk_sammendrag(page_traffic_trend) if tiltak.get("sider") else None
     dato = tiltak.get("dato")
     malord = {m.lower() for m in tiltak.get("malord", [])}
 
     if not malord or dato in (None, "planlagt"):
-        return {**tiltak, "status_vurdering": "ikke_vurdert"}
+        return {**tiltak, "status_vurdering": "ikke_vurdert", "sidetrafikk": sidetrafikk}
 
     try:
         start = datetime.strptime(dato, "%Y-%m-%d").date()
     except ValueError:
-        return {**tiltak, "status_vurdering": "ikke_vurdert"}
+        return {**tiltak, "status_vurdering": "ikke_vurdert", "sidetrafikk": sidetrafikk}
 
     weeks_active = max((today - start).days // 7, 0)
     malord_posisjoner = _malord_posisjoner(history_rows_mobil, malord)
@@ -81,10 +107,21 @@ def classify_tiltak(
         "status_vurdering": vurdering,
         "malord_posisjoner": malord_posisjoner,
         "malord_posisjoner_desktop": malord_posisjoner_desktop,
+        "sidetrafikk": sidetrafikk,
     }
 
 
 def classify_all(
-    tiltak_list: list[dict], history_rows_mobil: list[dict], history_rows_desktop: list[dict], today: date
+    tiltak_list: list[dict],
+    history_rows_mobil: list[dict],
+    history_rows_desktop: list[dict],
+    today: date,
+    page_traffic_trends: dict[str, list[dict]] | None = None,
 ) -> list[dict]:
-    return [classify_tiltak(t, history_rows_mobil, history_rows_desktop, today) for t in tiltak_list]
+    """page_traffic_trends: {tiltak['side']: trend} for tiltak med et 'sider'-felt, se
+    src.pipeline for hvor dette bygges (storage.get_page_group_traffic_trend per tiltak)."""
+    page_traffic_trends = page_traffic_trends or {}
+    return [
+        classify_tiltak(t, history_rows_mobil, history_rows_desktop, today, page_traffic_trends.get(t.get("side")))
+        for t in tiltak_list
+    ]

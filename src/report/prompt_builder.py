@@ -48,6 +48,12 @@ REPORT_FORMAT = """
    (samme, desktop) — bruk faktiske tall her ("boligverdi: mobil 8→3"), ikke bare
    statusetiketten. Nevn desktop-tallet spesifikt kun når det peker en annen vei enn mobil
    (reelt avvik verdt å flagge), ikke rutinemessig for hvert tiltak.
+   Tiltak som endrer HELE sider (ikke ett enkelt målord) har i tillegg et sidetrafikk-felt
+   (klikk_forst/klikk_sist, impresjoner_forst/impresjoner_sist, summert på tvers av alle
+   sidene i tiltaket) — bruk dette som hovedsignal for disse tiltakene fremfor enkelt-
+   målord-posisjon, siden en full sideomskriving ofte drar trafikk fra et bredere sett
+   long-tail-søk enn malord-listen fanger. Null/None betyr ingen data ennå (for tidlig),
+   ikke null trafikk.
 5. Avvik (>3 pos / >20 % klikk). Posisjonsavvik har et url-felt — nevn siden når den er
    kjent, ikke bare søkeordet, slik at avviket kan knyttes til en konkret side dere har
    jobbet med. Klikkavvik mangler url (GSC sin query-dimensjon gir ikke side per søkeord)

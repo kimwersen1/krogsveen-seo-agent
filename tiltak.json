@@ -121,7 +121,7 @@
   {
     "dato": "2026-08-24",
     "side": "12 eiendomsmegler-fylkessider (/eiendomsmegler/{fylke})",
-    "tiltak": "Endret av Kim 24.08.2026 (nøyaktig endring ikke spesifisert ennå — oppdater dette feltet når kjent). Alle 12 fylkessider: agder, akershus, buskerud, innlandet, moreromsdal, oslo, ostfold, rogaland, telemark, trondelag, vestfold, vestland (bekreftet via faktisk sidelenker på /eiendomsmegler, 24.08.2026 — matcher de 12 kontor-fylkene fra Customer Context §4).",
+    "tiltak": "Fullstendig omskriving: H1 nevnte tidligere ikke regionen i det hele tatt, ny H1 med regionnavn + betydelig ny brødtekst lagt til på alle 12 sidene (tidligere tynt/nesten tomt innhold).",
     "malord": [
       "eiendomsmegler agder",
       "eiendomsmegler akershus",
@@ -136,6 +136,21 @@
       "eiendomsmegler vestfold",
       "eiendomsmegler vestland"
     ],
-    "status": "aktiv"
+    "sider": [
+      "https://www.krogsveen.no/eiendomsmegler/agder",
+      "https://www.krogsveen.no/eiendomsmegler/akershus",
+      "https://www.krogsveen.no/eiendomsmegler/buskerud",
+      "https://www.krogsveen.no/eiendomsmegler/innlandet",
+      "https://www.krogsveen.no/eiendomsmegler/moreromsdal",
+      "https://www.krogsveen.no/eiendomsmegler/oslo",
+      "https://www.krogsveen.no/eiendomsmegler/ostfold",
+      "https://www.krogsveen.no/eiendomsmegler/rogaland",
+      "https://www.krogsveen.no/eiendomsmegler/telemark",
+      "https://www.krogsveen.no/eiendomsmegler/trondelag",
+      "https://www.krogsveen.no/eiendomsmegler/vestfold",
+      "https://www.krogsveen.no/eiendomsmegler/vestland"
+    ],
+    "status": "aktiv",
+    "notat": "Interessesignal er trafikk (klikk/impresjoner) til disse sidene, ikke bare posisjon på malord-listen — se 'sider'-feltet, brukt til dedikert sidetrafikk-sporing i tillegg til vanlig malord-posisjon."
   }
 ]
