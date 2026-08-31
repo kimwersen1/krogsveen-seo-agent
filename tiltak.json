@@ -117,5 +117,25 @@
       "finn solgte boliger"
     ],
     "status": "hos teknisk"
+  },
+  {
+    "dato": "2026-08-24",
+    "side": "12 eiendomsmegler-fylkessider (/eiendomsmegler/{fylke})",
+    "tiltak": "Endret av Kim 24.08.2026 (nøyaktig endring ikke spesifisert ennå — oppdater dette feltet når kjent). Alle 12 fylkessider: agder, akershus, buskerud, innlandet, moreromsdal, oslo, ostfold, rogaland, telemark, trondelag, vestfold, vestland (bekreftet via faktisk sidelenker på /eiendomsmegler, 24.08.2026 — matcher de 12 kontor-fylkene fra Customer Context §4).",
+    "malord": [
+      "eiendomsmegler agder",
+      "eiendomsmegler akershus",
+      "eiendomsmegler buskerud",
+      "eiendomsmegler innlandet",
+      "eiendomsmegler møre og romsdal",
+      "eiendomsmegler oslo",
+      "eiendomsmegler østfold",
+      "eiendomsmegler rogaland",
+      "eiendomsmegler telemark",
+      "eiendomsmegler trøndelag",
+      "eiendomsmegler vestfold",
+      "eiendomsmegler vestland"
+    ],
+    "status": "aktiv"
   }
 ]

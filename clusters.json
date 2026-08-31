@@ -4,7 +4,7 @@
   "finansiering": "finansieringsbevis|boliglån|egenkapital|lånebevis",
   "forsikring": "forsikring|eierskifte",
   "solgte_boliger": "solgt|eiendomsoverdragelse",
-  "lokal_megler": "(eiendoms)?megler (i )?(oslo|bergen|trondheim|stavanger|drammen|sandefjord|fredrikstad|tromsø|ålesund|tønsberg|kristiansand|hamar|moss|lillestrøm|asker|bærum)",
+  "lokal_megler": "(eiendoms)?megler (i )?(oslo|bergen|trondheim|stavanger|drammen|sandefjord|fredrikstad|tromsø|ålesund|tønsberg|kristiansand|hamar|moss|lillestrøm|asker|bærum|agder|akershus|buskerud|innlandet|møre og romsdal|østfold|rogaland|telemark|trøndelag|vestfold|vestland)",
   "merkevare": "krogsveen",
   "kjop": "til salgs|kjøpe bolig|enebolig|leilighet|rekkehus|gi bud|budrunde|finn bolig"
 }
