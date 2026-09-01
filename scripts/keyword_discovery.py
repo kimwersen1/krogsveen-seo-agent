@@ -34,6 +34,8 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
+import anthropic
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.analysis.keyword_gap import find_competitor_gap_keywords, find_untracked_ranking_keywords  # noqa: E402
@@ -198,7 +200,16 @@ def main() -> None:
         if previously_suggested:
             print(f"\nFant {len(previously_suggested)} tidligere foreslåtte artikler siste 3 kjøringer — sender med for å unngå gjentagelse.")
         print("Ber Claude om 2-3 grundige innholdsforslag (SEO + GEO) basert på gap-listen...")
-        briefs = generate_content_briefs(settings, result["untracked"], result["gaps"], previously_suggested)
+        # Krasjet HELE kjøringen 01.09.2026 (samme feilklasse som 27.07.2026-hendelsen i
+        # pipeline.py: tom Anthropic-kredittsaldo) — funnene over (untracked/gaps) hadde
+        # ALLEREDE kostet ~15 000 ekte Ahrefs-enheter og var ferdig innhentet, men gikk tapt
+        # fordi prepend_report_section() nedenfor aldri ble nådd. Samme robusthetsmønster
+        # som resten av pipelinen: degrader denne ene delstegen, ikke hele kjøringen.
+        try:
+            briefs = generate_content_briefs(settings, result["untracked"], result["gaps"], previously_suggested)
+        except anthropic.APIError as e:
+            print(f"Innholdsforslag hoppet over (Claude-kallet feilet: {e}). Sjekk kredittsaldo/API-nøkkel på console.anthropic.com. Søkeordsfunnene under er ikke påvirket.")
+            briefs = []
         briefs_doc_url = None
         if briefs:
             today_label = date.today().isoformat()
