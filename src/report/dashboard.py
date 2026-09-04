@@ -33,6 +33,7 @@ def build_dashboard_payload(
         "ar": analysis["ar"],
         "domain_rating": analysis.get("domain_rating"),
         "site_metrics": analysis.get("site_metrics"),
+        "gsc_org_traffic_30d": analysis.get("gsc_org_traffic_30d"),
         "gsc_site": analysis.get("gsc_site", []),
         "gsc_kilde": analysis.get("gsc_kilde", "ingen"),
         # cluster_summaries og organisk_fotavtrykk brukes ikke lenger av HTML-dashboardet
@@ -410,7 +411,16 @@ _TEMPLATE = r"""<!doctype html>
   // Rad 1: generelle SEO-nøkkeltall. Rad 2: GEO-selvsjekk per kilde — 8 ruter totalt
   // for en jevn 4x2-rutenett (bruker ba om dette 22.07.2026).
   addStat("Domain Rating", data.domain_rating ? data.domain_rating.domain_rating || "–" : "–");
-  addStat("Org. trafikk/mnd", data.site_metrics ? fmt.format(data.site_metrics.org_traffic || 0) : "–");
+  // Foretrekker ekte GSC-klikk (siste 30 dager) fremfor Ahrefs sitt modellerte
+  // org_traffic-estimat — bekreftet 04.09.2026 mot brukerens egen Looker Studio-
+  // rapport at Ahrefs undervurderte reell trafikk med ~48% samme periode. Ahrefs
+  // brukes fortsatt i konkurrenttabellen lenger ned, siden vi ikke har GSC-tilgang
+  // til konkurrentenes kontoer — kun Krogsveens eget tall kan erstattes med ekte data.
+  if (data.gsc_org_traffic_30d != null) {
+    addStat("Org. trafikk/mnd", fmt.format(data.gsc_org_traffic_30d), "GSC, siste 30 dager");
+  } else {
+    addStat("Org. trafikk/mnd", data.site_metrics ? fmt.format(data.site_metrics.org_traffic || 0) : "–", "Ahrefs-estimat (GSC utilgjengelig)");
+  }
   var allDevice = (data.gsc_site || []).find(function (r) { return r.device === "all"; });
   addStat("GSC-klikk (uke)", allDevice ? fmt.format(allDevice.clicks) : "–",
     allDevice ? fmt.format(allDevice.impressions) + " visninger" : "");

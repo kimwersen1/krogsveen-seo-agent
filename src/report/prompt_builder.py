@@ -4,6 +4,12 @@ from __future__ import annotations
 import json
 
 REPORT_FORMAT = """
+0. Trafikktall: hvis du nevner Krogsveens egen månedlige organiske trafikk noe sted, bruk
+   gsc_org_traffic_30d (ekte GSC-klikk, siste 30 dager) — IKKE site_metrics.org_traffic
+   (Ahrefs sitt modellerte estimat, bekreftet 04.09.2026 å undervurdere reell trafikk med
+   ~48% for Krogsveen). site_metrics/domain_rating er fortsatt riktig kilde for Krogsveen
+   sin Domain Rating (ingen GSC-ekvivalent) og for ALT om konkurrenter (vi har ikke
+   GSC-tilgang til deres kontoer, kun Ahrefs-estimater der).
 1. Hovedbildet (3–5 setninger).
 2. Per cluster: snittendring, antall opp/ned, topp 3 bevegelser hver vei. All posisjonsdata
    (cluster_summaries, avvik, tiltak) er fra mobil (~70 % av søkevolumet) — trenger ikke

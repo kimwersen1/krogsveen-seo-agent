@@ -139,6 +139,7 @@ def run_pipeline(
 
     gsc_source = "ingen"
     gsc_site_rows: list[dict] = []
+    gsc_org_traffic_30d = None
     if settings.gsc_oauth_configured:
         # Direkte tilgang via brukerens egen Google-konto — se src/collectors/gsc_oauth.py
         # for hvorfor dette virker uten admin-tilgang. Dekker nå også site-wide-tallene
@@ -159,6 +160,22 @@ def run_pipeline(
                 settings, windows["week_start"].isoformat(), gsc_available_end.isoformat()
             )
             gsc_source = "oauth"
+
+            # Ekte 30-dagers organisk klikk-tall (GSC, ikke Ahrefs-estimat) — bekreftet
+            # 04.09.2026 mot brukerens egen Looker Studio-rapport for nøyaktig samme
+            # periode: identisk til siste siffer (54 226 klikk). Ahrefs sin
+            # site-explorer/metrics org_traffic (site_metrics under) er en MODELLERT
+            # posisjon×CTR-estimering, ikke målte klikk, og undervurderte reell trafikk
+            # med ~48% samme periode — trolig fordi Ahrefs sin nøkkelord-database har
+            # reelle dekningshull for et mindre, regionalt marked som norsk eiendom.
+            # Brukes til dashboardets "Org. trafikk/mnd" for Krogsveen selv (der vi HAR
+            # ekte GSC-tilgang); konkurrenttabellen må fortsatt bruke Ahrefs-estimatet,
+            # siden vi ikke har GSC-tilgang til konkurrentenes egne kontoer.
+            gsc_30d_start = gsc_available_end - timedelta(days=29)
+            gsc_30d_rows = gsc_oauth.get_site_performance(
+                settings, gsc_30d_start.isoformat(), gsc_available_end.isoformat()
+            )
+            gsc_org_traffic_30d = next((r["clicks"] for r in gsc_30d_rows if r.get("device") == "all"), None)
 
             # Tiltak med et 'sider'-felt (f.eks. de 12 eiendomsmegler-fylkessidene,
             # 24.08.2026) er ofte lavtrafikk-sider som risikerer å falle utenfor
@@ -368,6 +385,7 @@ def run_pipeline(
         "periode": {"fra": week_start_label, "til": windows["week_end"].isoformat()},
         "domain_rating": domain_rating,
         "site_metrics": site_metrics,
+        "gsc_org_traffic_30d": gsc_org_traffic_30d,
         "gsc_site": gsc_site_rows,
         "gsc_kilde": gsc_source,
         "cluster_summaries": [vars(c) for c in cluster_summaries],
