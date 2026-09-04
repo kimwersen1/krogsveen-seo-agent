@@ -25,11 +25,15 @@ def generate_report(settings: Settings, analysis: dict) -> str:
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key, max_retries=5)
     with client.messages.stream(
         model=settings.anthropic_model,
-        # Hevet fra 12000 (22.07.2026) — analyse-JSON-en vokste betydelig da GEO-
-        # selvsjekken utvidet fra 2 til 4 LLM-kilder (Claude/ChatGPT/Gemini/Perplexity),
-        # og rapporten ble kuttet av grensen i praksis. Streaming (se over) gjør en
-        # romsligere grense trygg — ingen nettverkstimeout-risiko ved lengre generering.
-        max_tokens=16000,
+        # Hevet til 32000 (04.09.2026) — 16000 (selv etter forrige heving 22.07.2026
+        # fra 12000) ble likevel kuttet midt i seksjon 4, før seksjon 5/6 i det hele
+        # tatt ble skrevet (bekreftet: stop_reason='max_tokens', rapporten stoppet
+        # midt i en setning om det nye fylkesside-tiltaket). Sonnet 5 har adaptiv
+        # thinking PÅ som standard — thinking-tokens deler samme max_tokens-budsjett
+        # som selve svarteksten, så den synlige rapportteksten (normalt ~1500-2500
+        # tokens) er ikke det reelle taket. Streaming (se over) gjør en romslig
+        # grense trygg — ingen nettverkstimeout-risiko ved lengre generering.
+        max_tokens=32000,
         system=system_prompt,
         messages=[{"role": "user", "content": user_prompt}],
     ) as stream:
