@@ -82,9 +82,28 @@ jobs:
       # kjøring med tom database (GitHub-runnere er engangsbruk), og trendgrafer/
       # tiltaks-historikk over flere uker ville aldri bygget seg opp.
       - name: Publiser dashboard og historikk-database
+        # Retry-løkke lagt til 04.09.2026: en manuelt utløst kjøring kolliderte med en
+        # samtidig lokal commit+push (rapport-tekst-fiksen samme dag) — git push ble
+        # avvist ("fetch first"), og JOBBEN FEILET SELV OM RAPPORT-TEKSTEN OG E-POSTEN
+        # ALLEREDE VAR SENDT KORREKT (de skjer i forrige steg, upåvirket). Uten retry
+        # gikk denne ukens docs/index.html og data/history.db tapt siden GitHub-runnere
+        # er engangsbruk. git pull --rebase + inntil 5 forsøk løser en forbigående
+        # kollisjon uten å måtte kjøre HELE pipelinen (og sende enda en e-post) på nytt.
         run: |
           git config user.name "krogsveen-seo-agent"
           git config user.email "actions@github.com"
           git add docs/index.html data/history.db
-          git diff --staged --quiet && echo "Ingen endringer å committe" || git commit -m "Oppdater dashboard og historikk — uke $(date +%V)"
-          git push
+          if git diff --staged --quiet; then
+            echo "Ingen endringer å committe"
+            exit 0
+          fi
+          git commit -m "Oppdater dashboard og historikk — uke $(date +%V)"
+          for i in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push forsøk $i feilet, henter og rebaser..."
+            git pull --rebase origin main
+          done
+          echo "Push feilet etter 5 forsøk"
+          exit 1

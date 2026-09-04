@@ -58,5 +58,17 @@ jobs:
           git config user.name "krogsveen-seo-agent"
           git config user.email "actions@github.com"
           git add data/history.db docs/index.html
-          git diff --staged --quiet && echo "Ingen endringer å committe" || git commit -m "Oppdater innholdsforslag-historikk og dashboard"
-          git push
+          if git diff --staged --quiet; then
+            echo "Ingen endringer å committe"
+            exit 0
+          fi
+          git commit -m "Oppdater innholdsforslag-historikk og dashboard"
+          for i in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push forsøk $i feilet, henter og rebaser..."
+            git pull --rebase origin main
+          done
+          echo "Push feilet etter 5 forsøk"
+          exit 1
