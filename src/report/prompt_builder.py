@@ -49,6 +49,10 @@ REPORT_FORMAT = """
       (alltid 28) forteller hvor mange dager tallene faktisk dekker. Omtal det eksplisitt
       som "siste 28 dager" (eller tilsvarende), aldri som "denne uken" — lavvolum-tallene
       her blir ustabile/misvisende over en enkelt uke, derfor det lengre vinduet.
+      Vinduet er RULLERENDE (geo.ga4_ai_referral_start/_end viser eksakte datoer) — et tall
+      som går NED fra forrige rapport er normalt hvis en gammel dag med en konvertering/økt
+      falt ut av vinduet, ikke nødvendigvis et reelt fall. Sammenlign mot forrige ukes
+      ga4_ai_referral hvis tilgjengelig før du konkluderer med en trend i én retning.
 4. Tiltaks-effekt. Hvert tiltak har malord_posisjoner (mobil, første → siste kjente posisjon
    per målord — status_vurdering er også basert på denne) og malord_posisjoner_desktop
    (samme, desktop) — bruk faktiske tall her ("boligverdi: mobil 8→3"), ikke bare

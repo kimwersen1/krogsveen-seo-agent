@@ -630,7 +630,9 @@ _TEMPLATE = r"""<!doctype html>
   if (ga4Rows.length) {
     document.getElementById("ga4-card").style.display = "";
     var ga4Days = data.geo.ga4_ai_referral_periode_dager;
-    document.getElementById("ga4-period-badge").textContent = ga4Days ? "(siste " + ga4Days + " dager)" : "";
+    var ga4Start = data.geo.ga4_ai_referral_start, ga4End = data.geo.ga4_ai_referral_end;
+    var ga4PeriodText = (ga4Start && ga4End) ? "(" + ga4Start + " – " + ga4End + ", rullerende " + ga4Days + " dager)" : (ga4Days ? "(siste " + ga4Days + " dager)" : "");
+    document.getElementById("ga4-period-badge").textContent = ga4PeriodText;
     var ga4Body = document.querySelector("#ga4-table tbody");
     ga4Rows.forEach(function (r) {
       var tr = document.createElement("tr");

@@ -252,6 +252,7 @@ def run_pipeline(
     # dekker rapportens uke — periode_dager under må alltid leses med, og
     # prompt_builder.py/dashboardet må omtale det som "siste 28 dager", ikke "denne uken".
     ga4_ai_referral_rows: list[dict] = []
+    ga4_window_start, ga4_window_end = None, None
     if settings.ga4_configured:
         try:
             ga4_window_end = today
@@ -402,6 +403,15 @@ def run_pipeline(
             "perplexity_selvsjekk": perplexity_selfcheck,
             "ga4_ai_referral": ga4_ai_referral_rows,
             "ga4_ai_referral_periode_dager": 28,
+            # Eksplisitt dato-vindu (ikke bare dagtall) — lagt til 07.09.2026 etter at
+            # brukeren opplevde et tall som gikk NED (chatgpt.com-konverteringer 6->5)
+            # mellom to sjekker og leste det som at rapporten var utdatert/feil. Reelt
+            # forklart av at vinduet er rullerende (28 dager tilbake fra "i dag", ikke en
+            # fast periode) — en konvertering fra starten av forrige vindu falt naturlig
+            # ut. Eksplisitte datoer gjør denne mekanikken synlig i stedet for at et fall
+            # ser ut som en feil hver gang vinduet flytter seg en uke videre.
+            "ga4_ai_referral_start": ga4_window_start.isoformat() if ga4_window_start else None,
+            "ga4_ai_referral_end": ga4_window_end.isoformat() if ga4_window_end else None,
             # Domenevidt (ikke bare de 338 sporede ordene) — se ahrefs.get_ai_responses_count.
             "ai_responses_count": ai_responses_count,
         },
